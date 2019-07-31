@@ -1,0 +1,142 @@
+项目背景：
+	南通携程语音核心由两台思科4500X交换机组成，交换机通过VSS网络虚拟化技术虚拟成一台设备后入网运行。交换机型号为cisco ws-c4500x-16，设备运行时间3年33星期，ROM版本为15.0(1r)SG11，当前运行系统版本为 cat4500e-universalk9.SPA.03.07.01.E.152-3.E1，升级目标版本为cat4500e-universalk9.SPA.03.08.08.E.152-4.E8。另外设备仍然在保，并且客户已经开了standby case，此次升级允许业务中断时间为15分钟。
+
+项目分析：
+1，	此次升级版本文件由客户提供，为了确保升级的正常进行，我方也下载了相同的版本文件作为备份。另外为了确保文件的正确完整，升级前对版本文件进行MD5值比对。
+2，	参考文档要求，若要将系统升级到3.8.xE且计划使用VSS技术，则首先要将ROMMON版本升级到15.0(1r)SG11,目前设备ROMMON版本满足要求，所以可以直接升级系统版本，参考文档截图如下                                ：        
+3，	对于应用了VSS技术的设备，在升级时可采用ISSU不中断业务升级，也可采用中断业务重启的方式升级。考虑到ISSU升级要求较高，且客户允许升级期间业务中断，故采用中断业务重启的方式进行升级。另外业务中断允许时间15分钟，所以最终决定采用两台设备同时重启进行升级。
+4，	设备连续运行3年多，时间较长，重启故障的风险较高，为了保证客户的业务恢复，还需做好以下几个方面的准备：
+A，	确认是否由原厂服务，如果有，则确认下设备序列号和合同号，提前开好standby case，如果没有，则需要让销售提前准备备件
+B，	准备好原有设备的IOS镜像，以便RMA设备升级版本，同时注意下license迁移问题，因为只有license一致的设备才能组件VSS
+C，	准备好VSS的配置方式，方式新换的交换机加入后把配置同步给无故障的交换机。升级前导出设备配置。
+D，	了解进入rommon模式后的启动方法
+实施过程：
+1，	到达现场后第一时间校验客户给的升级文件，确保完整可用
+2，	Log采集设备上的信息，参考命令信息如下
+show run
+show redundancy
+show redundancy states
+show switch virtual   
+show switch virtual link                                       
+show switch virtual role                                    
+show switch virtual link detail                           
+show switch virtual link port-channel  
+show module
+show inventory
+show interface description
+show interface status
+show interfaces | i protocol|5 minute
+show cdp nei
+show version
+show bootvar
+show logg
+------------三层------------
+show ip ospf nei
+show ip route
+show ip ospf data
+show ip arp
+-----------二层------------
+show etherchannel summary
+show spanning-tree root
+show spanning-tree summary
+show spanning-tree active  detail
+show mac address-table
+3，	保存配置，导出startup-config
+SWI4033_4034CS4500#copy startup-config usb0:
+Destination filename [startup-config]? 
+13879 bytes copied in 0.020 secs (693950 bytes/sec)
+4，	查看设备上存储的文件,同时查看可用空间
+dir bootflash:
+		dir slavebootflash:
+5，	备份当前系统的IOS镜像文件，如果有license文件，一并导出
+copy bootflash:cat4500e-universalk9.SPA.03.07.01.E.152-3.E1.bin usb0:
+6，	选择合适的方式将新系统镜像文件导入到主备两台设备
+copy usb0: cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin bootflash:
+copy usb0: cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin slavebootflash:
+7，	再次查看设备上的文件，确保新文件已导入且大小一致正确
+dir bootflash:
+		dir slavebootflash:
+8，	查看原有配置中是否配置了系统启动文件，若有则删除
+show run后看到如下配置
+boot-start-marker
+boot system flash bootflash:cat4500e-universalk9.SPA.03.07.01.E.152-3.E1.bin
+boot-end-marker
+删除启动文件配置
+no boot system flash bootflash:cat4500e-universalk9.SPA.03.07.01.E.152-3.E1.bin
+9，	查看寄存器值，默认为0x2101，需要修改为0x2102
+SWI4033_4034CS4500#show bootvar
+SWI4033_4034CS4500(config)#config-register 0x2102
+备注：默认寄存器值为0x2101，这个值指定交换机从第一个IOS文件引导，忽略boot system flash指定的IOS文件。寄存器值若为0x2102，交换机将使用boot system flash命令指定的IOS文件引导。
+	10，设置交换机从新的IOS文件引导启动，然后保存
+SWI4033_4034CS4500(config)#boot system flash bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin
+11，确认新的IOS设置正确
+		SWI4033_4034CS4500#show bootvar 
+BOOT variable = bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin,1;
+CONFIG_FILE variable does not exist
+BOOTLDR variable does not exist
+Configuration register is 0x2102
+ 
+Standby BOOT variable = bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin,1;
+Standby CONFIG_FILE variable does not exist
+Standby BOOTLDR variable does not exist
+Standby Configuration register is 0x2102 
+ 
+boot-start-marker
+boot system flash bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin
+boot-end-marker
+12，保存并重启，正常等待5-10分钟
+		SWI4033_4034CS4500#write
+		SWI4033_4034CS4500#redundancy reload shelf
+			备注：关于重启方式的选择参考下图 
+13，重启后查看版本是否为目标版本，查看vss冗余状态，standy HOT表示2台设   备同步完成
+		SWI4033_4034CS4500>show redundancy states
+         my state = 13 -ACTIVE
+      	 peer state =  8 -STANDBY HOT 
+             Mode = Duplex
+             Unit = Primary
+          Unit ID = 1
+	14，再次Log采集设备上的信息，与升级前比对
+实施插曲：
+	1，本次升级实施前没有关注交换机的插口，默认准备使用ftp导入系统镜像文件，到了现场后发现全是光口，幸好提前两手准备，准备了U盘导入
+	2，升级过程中在删除原有的系统启动文件配置时操作失误，幸好全程log记录，及时发现问题及时改正
+	正确操作（删除旧的启动文件配置）：
+no boot system flash bootflash:cat4500e-universalk9.SPA.03.07.01.E.152-3.E1.bin
+	现场错误操作：
+no boot system flash cat4500e-universalk9.SPA.03.07.01.E.152-3.E1.bin
+错误操作后的现象如下：
+SWI4033_4034CS4500#show bootvar
+BOOT variable = ,1;bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin,1;
+CONFIG_FILE variable does not exist
+BOOTLDR variable does not exist
+Configuration register is 0x2102
+ 
+Standby BOOT variable = ,1;bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin,1;
+Standby CONFIG_FILE variable does not exist
+Standby BOOTLDR variable does not exist
+Standby Configuration register is 0x2102 
+
+boot-start-marker
+boot system flash 
+boot system flash bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin
+boot-end-marker
+
+修改方法：
+SWI4033_4034CS4500(config)#no boot system flash
+再次查看：
+SWI4033_4034CS4500#show bootvar 
+BOOT variable = bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin,1;
+CONFIG_FILE variable does not exist
+BOOTLDR variable does not exist
+Configuration register is 0x2102
+ 
+Standby BOOT variable = bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin,1;
+Standby CONFIG_FILE variable does not exist
+Standby BOOTLDR variable does not exist
+Standby Configuration register is 0x2102 
+ 
+boot-start-marker
+boot system flash bootflash:cat4500e-universalk9.SPA.03.08.08.E.152-4.E8.bin
+boot-end-marker
+
+
+3，提醒全程log记录，尤其设备重启时，以便发生问题时查找原因
