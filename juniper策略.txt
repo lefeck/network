@@ -1,0 +1,234 @@
+﻿不需要梳理的策略如下：
+
+set policy id 7502 from "Untrust" to "Trust"  "Any" "Any" "135" deny log 
+set policy id 7502
+set service "137"
+set service "138"
+set service "139"
+set service "3389"
+set service "445"
+set log session-init
+exit
+
+set policy id 5 name "172.22.0.0_to_10.197.5.0" from "Untrust" to "Trust"  "172.22.0.0/16" "10.197.5.0/24" "ANY" permit log 
+set policy id 5
+exit
+
+set policy id 6 name "ShiPingJianKong" from "Trust" to "Untrust"  "10.197.5.0/24" "172.22.0.0/16" "ANY" permit log 
+set policy id 6
+exit
+
+
+set policy id 7 name "YUNWEI" from "Trust" to "Untrust"  "188.188.8.196/32" "172.21.0.0/16" "ANY" permit log 
+set policy id 7
+set src-address "188.188.8.197/32"
+set src-address "188.188.8.198/32"
+set src-address "188.188.8.199/32"
+set src-address "188.188.8.200/32"
+set src-address "188.188.8.201/32"
+set src-address "188.188.8.202/32"
+set src-address "188.188.8.203/32"
+set src-address "188.188.8.204/32"
+set src-address "188.188.8.205/32"
+set src-address "188.188.8.206/32"
+set src-address "HAC_Group"
+set log session-init
+exit
+
+
+set policy id 1 name "172.21.0.0_to_172.24.0.1" from "Untrust" to "Trust"  "172.21.0.0/16" "172.24.0.1/32" "7000" nat dst ip 188.188.8.96 permit log 
+set policy id 1
+set service "9001"
+set service "9003"
+set service "FTP"
+set service "PING"
+set log session-init
+exit
+set policy id 2 name "172.21.0.0_to_172.24.0.2" from "Untrust" to "Trust"  "172.21.0.0/16" "172.24.0.2/32" "7000" nat dst ip 188.188.8.97 permit log 
+set policy id 2
+set service "FTP"
+set service "PING"
+exit
+
+set policy id 3 name "188.188.8.96_to_172.21.0.0" from "Trust" to "Untrust"  "188.188.8.96/32" "172.21.0.0/16" "7000" permit log 
+set policy id 3
+set service "7001"
+set service "8000"
+set service "PING"
+exit
+set policy id 4 name "188.188.8.97_to_172.21.0.0" from "Trust" to "Untrust"  "188.188.8.97/32" "172.21.0.0/16" "7000" permit log 
+set policy id 4
+set service "7001"
+set service "PING"
+exit
+set policy id 8 from "Trust" to "Untrust"  "192.168.255.101" "Any" "ANY" permit log 
+set policy id 8
+set log session-init
+exit
+set policy id 9 from "Untrust" to "Trust"  "Any" "192.168.255.101" "ANY" permit log 
+set policy id 9
+set log session-init
+exit  
+
+
+需要做策略梳理如下：
+
+
+set address "Trust" "10.188.192.127/32" 10.188.192.127 255.255.255.255
+set address "Trust" "10.188.49.132/32" 10.188.49.132 255.255.255.255
+set address "Untrust" "10.188.192.127/32" 10.188.192.127 255.255.255.255
+
+set address "Trust" "10.188.19.18/32" 10.188.19.18 255.255.255.255
+set address "Trust" "10.188.16.104/32" 10.188.16.104 255.255.255.255
+set address "Trust" "10.188.16.105/322" 10.188.16.105 255.255.255.255
+
+set address "Trust" "10.188.49.29/32" 10.188.49.29 255.255.255.255
+set address "Trust" "172.21.128.96/27" 172.21.128.96 255.255.255.255
+set address "Trust" "10.188.49.22/32" 10.188.49.22 255.255.255.255
+set address "Trust" "10.188.49.16/32" 10.188.49.16 255.255.255.255
+set address "Trust" "10.188.49.17/32" 10.188.49.17 255.255.255.255
+set address "Trust" "192.168.0.172/32" 192.168.0.172 255.255.255.255
+set address "Trust" "9.40.15.1/32" 9.40.15.1 255.255.255.255
+set address "Trust" "10.188.35.20/32" 10.188.35.20 255.255.255.255
+
+set address "Trust" "10.188.48.171/32" 10.188.48.171 255.255.255.255
+
+set address "Trust" "10.188.16.162/32" 10.188.16.162 255.255.255.255
+
+set address "Trust" "10.188.16.146/32" 10.188.16.146 255.255.255.255
+set address "Trust" "10.188.48.20/32" 10.188.48.20 255.255.255.255
+set address "Trust" "10.188.48.32/32" 10.188.48.32 255.255.255.255
+set address "Trust" "10.188.48.110/32" 10.188.48.110 255.255.255.255
+set address "Trust" "10.188.16.146/32" 10.188.16.146 255.255.255.255
+set address "Trust" "10.188.192.201/32" 10.188.192.201 255.255.255.255
+
+set address "Trust" "10.188.80.20/32" 10.188.80.20 255.255.255.255
+
+set address "Trust" "10.188.253.3/32" 10.188.253.3 255.255.255.255
+set address "Trust" "10.188.253.4/32" 10.188.253.4 255.255.255.255
+
+set address "Trust" "10.188.19.22/32" 10.188.19.22 255.255.255.255
+set address "Trust" "10.188.17.51/32" 10.188.17.51 255.255.255.255
+set address "Trust" "10.188.17.52/32" 10.188.17.52 255.255.255.255
+
+set address "Trust" "10.188.225.252/32" 10.188.225.252 255.255.255.255
+set address "Trust" "10.188.225.253/32" 10.188.225.253 255.255.255.255
+
+
+set policy id 7000 name "LH_ATM-ATM_QianZhi" from "Untrust" to "Trust"  "172.21.0.0/16" "10.188.192.127/32" "21005-long" permit log 
+set policy id 7000
+set service "ICMP-ANY"
+set log session-init
+exit
+set policy id 7001 name "ATM_QianZhi-LH_ATM" from "Trust" to "Untrust"  "10.188.192.127/32" "172.21.0.0/16" "21002" permit log 
+set policy id 7001
+set service "ICMP-ANY"
+set log session-init
+exit
+
+set policy id 7003 name "172.25toLEDServer" from "Untrust" to "Trust"  "172.25.0.0/16" "10.188.49.132/32" "ANY" permit log 
+set policy id 7003
+set log session-init
+exit
+
+set policy id 7004 name "172.25toZHLCXS-VIP" from "Untrust" to "Trust"  "172.25.0.0/16" "10.188.19.18/32" "9081" permit log 
+set policy id 7004
+set dst-address "10.188.16.104/32"
+set dst-address "10.188.16.105/32"
+set service "9082"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+set policy id 7005 name "172.25toMail" from "Untrust" to "Trust"  "172.25.0.0/16" "10.188.49.29/32" "HTTP" permit log 
+set policy id 7005
+set src-address "172.21.128.96/27"
+set dst-address "10.188.49.22/32"
+set dst-address "10.188.49.16/32"
+set dst-address "10.188.49.17/32"
+set dst-address "192.168.0.172/32"
+set dst-address "9.40.15.1/32"
+set dst-address "10.188.35.20/32"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+
+set policy id 7006 name "SheQuYinHangTODLBankSJFWPT" from "Untrust" to "Trust"  "172.25.0.0/16" "10.188.48.171/32" "8080" permit log 
+set policy id 7006
+set service "ICMP-ANY"
+set log session-init
+exit
+
+
+set policy id 7007 name "SheQu-GeRenXinDai" from "Untrust" to "Trust" "172.21.128.96/27" "10.188.16.162/32" "7777" permit log 
+set policy id 7007
+set src-address "172.25.0.0/16"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+
+set policy id 7008 name "SheQu-XinDaiGuanLi" from "Untrust" to "Trust"  "172.21.128.96/27" "10.188.16.146/32" "9080" permit log 
+set policy id 7008
+set src-address "172.25.0.0/16"
+set dst-address "10.188.48.20/32"
+set dst-address "10.188.48.32/32"
+set dst-address "10.188.48.110/32"
+set dst-address "10.188.16.146/32"
+set dst-address "10.188.192.201/32"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+set policy id 7009 from "Trust" to "Untrust"  "10.188.49.132/32" "172.25.0.0/16" "ANY" permit log 
+set policy id 7009
+set log session-init
+exit
+set policy id 7010 from "Untrust" to "Trust"  "172.21.0.0/16" "10.188.80.20/32" "DNS" permit log 
+set policy id 7010
+set src-address "172.25.0.0/16"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+set policy id 7011 from "Untrust" to "Trust"  "172.21.0.0/16" "10.188.253.3/32" "ICMP-ANY" permit log 
+set policy id 7011
+set src-address "172.25.0.0/16"
+set dst-address "10.188.253.4/32"
+set service "NTP"
+set log session-init
+exit
+
+set policy id 7012 from "Untrust" to "Trust"  "172.21.0.0/16" "10.188.19.22/32" "6161" permit log 
+set policy id 7012
+set src-address "172.25.0.0/16"
+set dst-address "10.188.17.51/32"
+set dst-address "10.188.17.52/32"
+set service "6262"
+set service "8080"
+set service "9080"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+set policy id 7013 from "Untrust" to "Trust"  "172.25.0.0/16" "10.188.225.252/32" "8043" permit log 
+set policy id 7013
+set dst-address "10.188.225.253/16"
+set service "8045"
+set service "8081"
+set service "8082"
+set service "8085"
+set service "8086"
+set service "8992"
+set service "ICMP-ANY"
+set log session-init
+exit
+
+
+set policy id 7014 from "Untrust" to "Trust"  "172.21.0.0/16" "10.190.176.10/32" "DNS" permit log 
+set policy id 7014
+set src-address "172.25.0.0/16"
+set src-address "10.188.0.0/16"
+set log session-init
+exit

@@ -1,0 +1,79 @@
+Linux下绑定网卡的操作记录
+ 
+公司采购的服务器安装了双网卡，并进行bond网卡绑定设置，网卡绑定mode共有七种(0~6) bond0、bond1、 bond2、bond3、bond4、bond5、bond6。 第一种模式：mod=0 ，即：(balance-rr) Round-robin policy（平衡抡循环策略） 特点：传输数据包顺序是依次传输（即：第1个包走eth0，下一个包就走eth1….一直循环下去，直到最后一个传输 完毕），此模式提供负载平衡和容错能力；但是我们知道如果一个连接或者会话的数据包从不同的接口发出的话， 中途再经过不同的链路，在客户端很有可能会出现数据包无序到达的问题，而无序到达的数据包需要重新要求被发 送，这样网络的吞吐量就会下降。 第二种模式：mod=1，即： (active-backup) Active-backup policy（主-备份策略） 特点：只有一个设备处于活动状态，当一个宕掉另一个马上由备份转换为主设备。mac地址是外部可见得，从外面 看来，bond的MAC地址是唯一的，以避免switch(交换机)发生混乱。此模式只提供了容错能力；由此可见此算法 的优点是可以提供高网络连接的可用性，但是它的资源利用率较低，只有一个接口处于工作状态，在有 N 个网络接 口的情况下，资源利用率为1/N。 第三种模式：mod=2，即：(balance-xor) XOR policy（平衡策略） 特点：基于指定的传输HASH策略传输数据包。缺省的策略是：(源MAC地址 XOR 目标MAC地址) % slave数量。 其他的传输策略可以通过xmit_hash_policy选项指定，此模式提供负载平衡和容错能力。 第四种模式：mod=3，即：broadcast（广播策略） 特点：在每个slave接口上传输每个数据包，此模式提供了容错能力 第五种模式：mod=4，即：(802.3ad) IEEE 802.3ad Dynamic link aggregation（IEEE 802.3ad 动态链 接聚合） 特点：创建一个聚合组，它们共享同样的速率和双工设定。根据802.3ad规范将多个slave工作在同一个激活的聚 合体下。 外出流量的slave选举是基于传输hash策略，该策略可以通过xmit_hash_policy选项从缺省的XOR策略改变到其 他策略。需要注意的 是，并不是所有的传输策略都是802.3ad适应的，尤其考虑到在802.3ad标准43.2.4章节提 及的包乱序问题。不同的实现可能会有不同的适应 性。 必要条件： 条件1：ethtool支持获取每个slave的速率和双工设定
+条件2：switch(交换机)支持IEEE 802.3ad Dynamic link aggregation
+条件3：大多数switch(交换机)需要经过特定配置才能支持802.3ad模式
+第六种模式：mod=5，即：(balance-tlb) Adaptive transmit load balancing（适配器传输负载均衡） 特点：不需要任何特别的switch(交换机)支持的通道bonding。在每个slave上根据当前的负载（根据速度计算） 分配外出流量。如果正在接受数据的slave出故障了，另一个slave接管失败的slave的MAC地址。 该模式的必要条件：ethtool支持获取每个slave的速率 第七种模式：mod=6，即：(balance-alb) Adaptive load balancing（适配器适应性负载均衡） 特点：该模式包含了balance-tlb模式，同时加上针对IPV4流量的接收负载均衡(receive load balance, rlb)，而 且不需要任何switch(交换机)的支持。接收负载均衡是通过ARP协商实现的。bonding驱动截获本机发送的ARP应 答，并把源硬件地址改写为bond中某个slave的唯一硬件地址，从而使得不同的对端使用不同的硬件地址进行通 信。 来自服务器端的接收流量也会被均衡。当本机发送ARP请求时，bonding驱动把对端的IP信息从ARP包中复制并保 存下来。当ARP应答从对端到达 时，bonding驱动把它的硬件地址提取出来，并发起一个ARP应答给bond中的某 个slave。使用ARP协商进行负载均衡的一个问题是：每次广播 ARP请求时都会使用bond的硬件地址，因此对端学 习到这个硬件地址后，接收流量将会全部流向当前的slave。这个问题可以通过给所有的对端发送更新 （ARP应 答）来解决，应答中包含他们独一无二的硬件地址，从而导致流量重新分布。当新的slave加入到bond中时，或者 某个未激活的slave重新 激活时，接收流量也要重新分布。接收的负载被顺序地分布（round robin）在bond中最 高速的slave上 当某个链路被重新接上，或者一个新的slave加入到bond中，接收流量在所有当前激活的slave中全部重新分配， 通过使用指定的MAC地址给每个 client发起ARP应答。下面介绍的updelay参数必须被设置为某个大于等于 switch(交换机)转发延时的值，从而保证发往对端的ARP应答 不会被switch(交换机)阻截。 必要条件：
+
+http://www.cnblogs.com/kevingrace/p/7966511.html 2/6
+条件1：ethtool支持获取每个slave的速率；
+条件2：底层驱动支持设置某个设备的硬件地址，从而使得总是有个slave(curr_active_slave)使用bond的 硬件地址，同时保证每个bond 中的slave都有一个唯一的硬件地址。如果curr_active_slave出故障，它的硬 件地址将会被新选出来的 curr_active_slave接管
+其实mod=6与mod=0的区别：mod=6，先把eth0流量占满，再占eth1，….ethX；而mod=0的话，会发现2个 口的流量都很稳定，基本一样的带宽。而mod=6，会发现第一个口流量很高，第2个口只占了小部分流量 下面简单介绍下bond绑定双网卡的操作记录：
+通过网口绑定(bond)技术,可以很容易实现网口冗余，负载均衡，从而达到高可用高可靠的目的。 2个物理网口分别是：eth0,eth1 绑定后的虚拟口是：bond0 服务器IP是：10.0.54.28 采用mod=4模式（常用模式） 
+ 
+首先查看网卡是否支持bond绑定 [root@test ~]# modinfo bonding |more filename:       /lib/modules/2.6.32-696.16.1.el6.x86_64/kernel/drivers/net/bonding/bonding.ko author:         Thomas Davis, tadavis@lbl.gov and many others description:    Ethernet Channel Bonding Driver, v3.7.1 version:        3.7.1 license:        GPL alias:          rtnl-link-bond srcversion:     454FF5806F146AD7FB41356 depends:         vermagic:       2.6.32-696.16.1.el6.x86_64 SMP mod_unload modversions 
+ 
+然后进行网卡绑定设置 [root@test ~]# cd /etc/sysconfig/network-scripts/ [root@test network-scripts]# cat ifcfg-eth0 DEVICE=eth0 HWADDR=EC:F4:BB:DC:4C:0C TYPE=Ethernet UUID=669f0694-9c52-4792-bd67-22c9d2c17acb ONBOOT=yes NM_CONTROLLED=no BOOTPROTO=none MASTER=bond0 SLAVE=yes 
+ 
+[root@test network-scripts]# cat ifcfg-eth1 DEVICE=eth1 HWADDR=EC:F4:BB:DC:4C:0D TYPE=Ethernet UUID=1d2f30f4-b3f0-41a6-8c37-54f03115f7bd ONBOOT=yes NM_CONTROLLED=no BOOTPROTO=none MASTER=bond0 SLAVE=yes 
+ 
+[root@test network-scripts]# cat ifcfg-bond0  DEVICE=bond0 NAME='bond0' TYPE=Ethernet NM_CONTROLLED=no USERCTL=no ONBOOT=yes BOOTPROTO=none IPADDR=10.0.54.28 NETMASK=255.255.255.0 GATEWAY=10.0.54.1 BONDING_OPTS='mode=4 miimon=100' IPV6INIT=no 
+ 
+[root@test network-scripts]# cat /etc/modprobe.d/bonding.conf       //这个文件一般需要手动创建 alias bond0 bonding options bonding mode=4 miimon=100 
+ 
+[root@test network-scripts]# modprobe bonding           //需要执行这一步，不然即使重启网卡后，网络不 通 
+ 
+
+
+重启网卡。需要先关闭NetworkManager服务，并设置开启关闭！ [root@test network-scripts]#/etc/init.d/NetworkManager stop [root@test network-scripts]# /etc/init.d/network restart 
+ 
+查看bond网卡绑定后的模式 [root@test network-scripts]# cat /proc/net/bonding/bond0  Ethernet Channel Bonding Driver: v3.7.1 (April 27, 2011) 
+ 
+Bonding Mode: IEEE 802.3ad Dynamic link aggregation               //显示bond网卡绑定的模式 Transmit Hash Policy: layer2 (0) MII Status: up MII Polling Interval (ms): 100 Up Delay (ms): 0 Down Delay (ms): 0 
+ 
+802.3ad info LACP rate: slow Min links: 0 Aggregator selection policy (ad_select): stable System priority: 65535 System MAC address: 08:94:ef:54:b0:88 Active Aggregator Info:  Aggregator ID: 2  Number of ports: 2  Actor Key: 9  Partner Key: 1453  Partner Mac Address: 00:23:04:ee:be:d2 
+ 
+Slave Interface: eth0 MII Status: up                           //查看网卡绑定后的状态 （up or down）                        Speed: 1000 Mbps Duplex: full Link Failure Count: 0 Permanent HW addr: 08:94:ef:54:b0:88 Slave queue ID: 0 Aggregator ID: 2 Actor Churn State: none Partner Churn State: none Actor Churned Count: 0 Partner Churned Count: 0 details actor lacp pdu:     system priority: 65535     system mac address: 08:94:ef:54:b0:88     port key: 9     port priority: 255     port number: 1     port state: 61 details partner lacp pdu:     system priority: 32667     system mac address: 00:23:04:ee:be:d2     oper key: 1453     port priority: 32768     port number: 8461     port state: 61 
+ 
+Slave Interface: eth1 MII Status: up Speed: 1000 Mbps Duplex: full Link Failure Count: 0 Permanent HW addr: 08:94:ef:54:b0:89 Slave queue ID: 0 Aggregator ID: 2 Actor Churn State: none Partner Churn State: none Actor Churned Count: 0 Partner Churned Count: 0 details actor lacp pdu:     system priority: 65535     system mac address: 08:94:ef:54:b0:88     port key: 9     port priority: 255 
+
+
+============================================ 为了增强服务器的网络连通性，可以选择采用mode=1的"主-备份"策略来配置两个网卡：每次只有一个网卡处于活动 状态，在一个网卡出现问题无法使用 时可以快速的切换到另外一张网卡上去，保证网络的持续可用。当然缺点是每次只有一个网卡工作，因此硬件资源 的利用率不高。 
+ 
+使用四个物理网卡，绑定两组bond，即bond0和bond1。bond0采用mode=4模式，bond1采用mode=1的主备模式。 那么注意在设置bond0和bond1的时候，别设置两个网关地址，否则网络有问题。bond设置的时候可以不写网关地 址。
+也可以使用下面的脚本进行如上的绑定网卡设置本，这是一个通用脚本，直接复制即可使用！（脚本中采用的是 mode=4模式，如果采用其他模式，将在脚本中修改mode配置）
+[root@test ~]# cat set_bond.sh  #!/bin/bash if [ $# != 4 ] ; then  echo "USAGE: $0 bondname   eth1  eth2  IP "  echo " e.g.: $0 bond1 em3  em4  10.0.1.1"  exit 1 fi  
+ 
+ 
+bondname=$1  card1=$2 card2=$3 IP=$4 
+ 
+GATEWAY=`echo -n $IP | awk -F '.' '{ print $1 "." $2 "." $3 "." }'`'1' echo ip address is $IP echo netmask is 255.255.255.0 echo gateway is $GATEWAY echo bondname is $bondname 
+ 
+echo   -e "\033[42;33m  do you want to go on (Y|N)(NO and exit default): \033[0m" read ANS     case $ANS in     y|Y|yes|Yes|YES)        ;;     n|no|No|NO|N)      exit 1         ;;      *)      echo "exit becasuse you cancel it "      exit 1       ;;      esac   #bond0 config echo "DEVICE=$bondname" > /etc/sysconfig/network-scripts/ifcfg-$bondname echo "BOOTPROTO=none" >> /etc/sysconfig/network-scripts/ifcfg-$bondname echo "ONBOOT=yes" >> /etc/sysconfig/network-scripts/ifcfg-$bondname echo "IPADDR=$IP" >> /etc/sysconfig/network-scripts/ifcfg-$bondname echo "NETMASK=255.255.255.0" >> /etc/sysconfig/network-scripts/ifcfg-$bondname echo "GATEWAY=$GATEWAY" >> /etc/sysconfig/network-scripts/ifcfg-$bondname 
+ 
+ 
+cat > /etc/sysconfig/network-scripts/ifcfg-$card1 <<EOF BOOTPROTO=none DEVICE=$card1 ONBOOT=yes MASTER=$bondname SLAVE=yes EOF 
+@潇湘隐者恩,是的。 du -sh -k 或 du -s h -b都可以的。... --散尽浮华 3. Re:jenkins配置记录（2）--代码发布 流程 深度好文呀，谢谢作者 --Sunzz 4. Re:Linux下自动清理超过指定大小的文 件(shell脚本,通过du -sh) 使用du -sk * 应该可以避免du -sh * 遇到 的问题 --潇湘隐者 5. Re:[原创]CI持续集成系统环境--Gitlab +Gerrit+Jenkins完整对接 @学习＆變壞请问这个问题你解决了吗？我 也遇到了，不知道问题出在哪里？... --浪漫罗比 6. Re:运维中的日志切割操作梳理（Logro tate/python/shell脚本实现） 学习了 --abc0012383 7. Re:Docker集中化web界面管理平台-S hipyard部署记录 你好，博主，docker现在安装shipyard 时， curl -s  | bash -s ，是失效了吗？ --大数据和AI躺过的坑 8. Re:php5.6安装Zend Opcache扩展 "当你发现自己的才华撑不起野心时，就请 安静下来学习吧" 我喜欢这句话！ --天使之崖 9. Re:Mysql之binlog日志说明及利用binl og日志恢复数据操作记录 大佬，二进制文件怎么手工从里面把drop database这条记录删除呢？ --瑜珈山脚 10. Re:mysql主从同步(3)-percona-tool kit工具（数据一致性监测、延迟监控）使 用梳理 感谢博主 --DB-Engineer
+阅读排行榜
+1. Git忽略提交规则 - .gitignore配置运维 总结(180913) 2. 完整部署CentOS7.2+OpenStack+kv m 云平台环境（1）--基础环境搭建(8207 4) 3. ELK实时日志分析平台环境部署--完整记 录(76715) 4. mysql数据库误删除后的数据恢复操作 说明(73936) 5. Linux终端复用神器-Tmux使用梳理(49 390) 6. Nginx+keepalived双机热备（主从模 式）(39441) 7. Maven私服Nexus3.x环境构建操作记 录(39266) 8. OpenStack构架知识梳理(37987) 9. 执行git push出现"Everything up-todate"(37049) 10. Gitlab利用Webhook实现Push代码后 的jenkins自动构建(36915)
+评论排行榜
+1. 完整部署CentOS7.2+OpenStack+kv m 云平台环境（1）--基础环境搭建(115) 2. [原创]CI持续集成系统环境---部署gerri t环境完整记录(17) 3. kvm虚拟化管理平台WebVirtMgr部署完整记录(1)(16) 4. ELK实时日志分析平台环境部署--完整记 录(13)
+2018/10/13 Linux下绑定网卡的操作记录 - 散尽浮华 - 博客园
+http://www.cnblogs.com/kevingrace/p/7966511.html 5/6
+散尽浮华 关注 - 23 粉丝 - 1106
++加关注
+0 0
+posted @ 2017-12-03 17:09 散尽浮华 阅读(897) 评论(0) 编辑 收藏
+ 
+cat > /etc/sysconfig/network-scripts/ifcfg-$card2 <<EOF BOOTPROTO=none DEVICE=$card2 ONBOOT=yes MASTER=$bondname SLAVE=yes EOF       #modprobe config echo "alias $bondname bonding" >> /etc/modprobe.d/bonding.conf echo "options $bondname miimon=100 mode=4" >> /etc/modprobe.d/bonding.conf modprobe bonding 
+ 
+#重启网卡或重启机器 /etc/init.d/network  restart 
+执行脚本：
+[root@test ~]# sh -x set_bond.sh bond0 eth0 eht1 10.0.54.28 ..... yes          //执行过程中需要输入yes .... 问题：
+reboot重启服务器后，发现远程连接不上服务器。现场登陆服务器查看，发现bond0的ip地址不在了！！ 
+ 
+原因分析： 服务器rebboot重启后，NetworkManager服务默认开启了，导致network服务启动不生效！ 
+ 
+解决办法： # systemctl stop NetworkManager # systemctl disable NetworkManager # systemctl restart network # modprobe bonding 
+ 
+可以把关闭NetworkManager的操作放到系统的初始化脚本中

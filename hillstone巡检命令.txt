@@ -1,0 +1,39 @@
+10.254.202.12(11)
+10.254.202.13(11)
+10.254.202.22(21)
+10.254.202.23(21)
+10.254.202.32(31)
+10.254.202.33(31)
+10.254.202.62(61)
+10.254.202.63(61)
+10.254.202.76(75)
+10.254.202.77(75)
+10.254.255.62(61)
+10.254.255.63(61)
+
+
+hillstone查看命令状态：
+
+terminal length 0 
+show interface 
+show config 
+show ha link status 
+show ha group 0 
+show ha cluster 
+show policy 
+show ip route 
+show mac
+show snat 
+show process 
+show environment 
+show module 
+show inventory 
+show boot variables 
+dir 
+show logging 
+show clock 
+show version
+show license
+show policy
+show session
+show ntp status

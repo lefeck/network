@@ -1,0 +1,56 @@
+﻿
+ssh配置
+生成本地密钥对：
+rsa local-key-pair create  创建密钥
+配置ssh用户的认证方式和服务方式
+stelnet server enable 启用stelnet服务
+ssh user admin  #ssh用户名
+ssh user admin authentication-type password #ssh认证使用密码
+ssh user admin service-type stelnet #ssh登录服务类型
+
+创建SSH用户及密码
+aaa
+local-user admin privilege level 15 
+local-user admin service-type telnet ssh
+local-user admin password cipher admin123
+
+在VTY下调用：
+user-interface vty 0 4
+authentication-mode aaa
+protocol inbound all
+
+测试
+ssh client first-time enable 下载公用秘钥对
+stelnet 192.168.1.2 
+
+
+
+在管理接口未启用vpn-instance时，acl配置策略如下：
+acl name VTY-ACL
+ rule permit ip source 10.254.160.48 0.0.0.3
+ rule permit ip source 10.254.161.48 0.0.0.3
+ rule permit ip source 10.254.160.80 0.0.0.3
+ rule permit ip source 10.253.160.240 0.0.0.7
+ rule permit ip source 10.188.255.0 0.0.0.255
+ rule permit ip source 10.254.194.0 0.0.0.255
+ quit
+user-interface vty 0 4
+ acl VTY-ACL inbound
+ commit
+ return
+save
+
+在管理接口启用vpn-instance时，acl配置策略如下：
+acl name VTY-ACL
+ rule permit ip source 10.254.160.48 0.0.0.3 vpn-instance NAME
+ rule permit ip source 10.254.161.48 0.0.0.3 vpn-instance NAME
+ rule permit ip source 10.254.160.80 0.0.0.3 vpn-instance NAME
+ rule permit ip source 10.253.160.240 0.0.0.7 vpn-instance NAME
+ rule permit ip source 10.188.255.0 0.0.0.255 vpn-instance NAME
+ rule permit ip source 10.254.194.0 0.0.0.255 vpn-instance NAME
+ quit
+user-interface vty 0 4
+ acl VTY-ACL inbound
+ commit
+ return
+save

@@ -1,0 +1,36 @@
+
+Configuring Policy Static NAT
+
+static (real_interface,mapped_interface){mapped_ip | interface} access-list acl_name [dns] [norandomseq] [[tcp]tcp_max_conns [emb_limit]] [udp udp_max_conns]
+
+Example:
+策略：
+hostname(config)# access-list NET1 permit ip host 10.1.2.27 209.165.201.0 255.255.255.224
+hostname(config)# access-list NET2 permit ip host 10.1.2.27 209.165.200.224 255.255.255.224
+静态nat策略：
+hostname(config)# static (inside,outside) 209.165.202.129 access-list NET1
+hostname(config)# static (inside,outside) 209.165.202.130 access-list NET2
+
+The following command maps an inside IP address (10.1.1.3) to an outside IP address (209.165.201.12):
+
+hostname(config)# static (inside,outside) 209.165.201.12 10.1.1.3 netmask 255.255.255.255
+
+The following command maps the outside address (209.165.201.15) to an inside address (10.1.1.6):
+hostname(config)# static (outside,inside) 10.1.1.6 209.165.201.15 netmask 255.255.255.255
+
+The following command statically maps an entire subnet:
+hostname(config)# static (inside,dmz) 10.1.1.0 10.1.2.0 netmask 255.255.255.0
+
+
+Dynamic NAT and PAT
+
+nat (real_interface) nat_id access-list acl_name [dns] [outside][[tcp] tcp_max_conns [emb_limit]] [udp udp_max_conns][norandomseq]
+
+global (mapped_interface) nat_id {mapped_ip[-mapped_ip] | interface}
+
+Example:
+hostname(config)# access-list NET1 permit ip 10.1.2.0 255.255.255.0 209.165.201.0 255.255.255.224
+hostname(config)# access-list NET2 permit ip 10.1.2.0 255.255.255.0 209.165.200.224 255.255.255.224
+hostname(config)# nat (inside) 1 access-list NET1 tcp 0 2000 udp 10000
+hostname(config)# global (outside) 1 209.165.202.129
+hostname(config)# nat (inside) 2 access-list NET2 tcp

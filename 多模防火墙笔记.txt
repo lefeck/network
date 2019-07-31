@@ -1,0 +1,126 @@
+
+1.Configure a Security Context （配置安全上下文）
+
+ciscoasa(config)# context admin    添加名为admin的文本
+ciscoasa(config-ctx)# description Admin Context  添加描述
+分配指定的接口在当前使用的安全上下文中
+ciscoasa(config-ctx)# allocate-interface gigabitethernet0/1.100 int1 
+ciscoasa(config-ctx)# allocate-interface gigabitethernet0/1.200 int2 
+ciscoasa(config-ctx)# config-url disk0:/admin.cfg  
+ciscoasa(config-ctx)# join-failover-group 2 当主的挂了之后，切换到备的正常工作
+
+注：只有在配置context上分配接口
+
+
+2.标识URL从哪个系统下载安全上下文配置
+
+ciscoasa(config-ctx)# config-url ftp://user1:passw0rd@10.1.1.1/configlets/test.cfg
+Example: 
+ciscoasa(config)# mkdir disk1:/private-storage 
+ciscoasa(config)# mkdir disk1:/shared-storage 
+ciscoasa(config)# context admin 
+ciscoasa(config-ctx)# storage-url private disk1:/private-storage context 
+ciscoasa(config-ctx)# storage-url shared disk1:/shared-storage shared
+
+注：上述配置通常用做文件共享和独立存储
+
+3.Change the Security Context URL 安全上下文之间切换
+
+ciscoasa(config)# context ctx1 创建新的url为ctx1
+ciscoasa(config)# changeto context ctx1 切换到ctxl当中
+ciscoasa/ctx1(config)# clear configure all 清除当前url中的配置
+ciscoasa/ctx1(config)# changeto system 切换系统执行空间到配置模式
+ciscoasa(config)# 
+ciscoasa/ctx1(config)# copy startup-config running-config 重新加载配置
+
+注：在切换到context只能做查看等操作，不能做接口划分
+
+
+4.命令查看：
+
+show context [name|detail|count] 
+show running-config all context 查看当前运行所有context配置
+
+多模防火墙配置示例：
+interface Port-channel1
+!
+interface Port-channel1.913
+ description PUB_Inside
+ vlan 913
+!
+interface Port-channel1.915
+ description DMZ_Outside
+ vlan 915
+!
+interface Port-channel1.921
+ description BIZ1_Inside
+ vlan 921
+!
+interface Port-channel1.923
+ description BIZ2_Inside
+ vlan 923
+!
+interface Port-channel2
+!
+interface Port-channel2.912
+ description PUB_Outside
+ vlan 912
+!
+interface Port-channel2.914
+ description DMZ_Inside
+ vlan 914
+!
+interface Port-channel2.920
+ description BIZ1_Outside
+ vlan 920     
+!
+interface Port-channel2.922
+ description BIZ2_Outside
+ vlan 922
+
+
+admin-context admin
+context admin
+  description admin
+  allocate-interface Management1/1 
+  config-url disk0:/admin.cfg
+  join-failover-group 1
+!
+
+context PUB
+  description PUB
+  allocate-interface Port-channel1.913 
+  allocate-interface Port-channel2.912 
+  config-url disk0:/PUB.cfg
+  join-failover-group 1
+!
+
+context DMZ
+  description DMZ
+  allocate-interface Port-channel1.915 
+  allocate-interface Port-channel2.914 
+  config-url disk0:/DMZ.cfg
+  join-failover-group 2
+!
+
+context BIZ1
+  description BIZ1
+  allocate-interface Port-channel1.921 
+  allocate-interface Port-channel2.920 
+  config-url disk0:/BIZ1.cfg
+  join-failover-group 2
+!
+
+context BIZ2
+  description BIZ2
+  allocate-interface Port-channel1.923 
+  allocate-interface Port-channel2.922 
+  config-url disk0:/BIZ2.cfg
+  join-failover-group 2
+!
+
+failover group 1
+  preempt
+failover group 2
+  secondary
+  preempt

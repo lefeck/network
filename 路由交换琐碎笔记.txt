@@ -1,0 +1,587 @@
+	在可堆叠的 IOS 交换机中，可选择 0.5 米、1 米和 3 米这三种规格的 StackWise 堆叠电缆，用于不同堆叠类型的交换机连接。
+	方式一：全部是使用 0.5 米规格的堆叠电缆的。它通过两组连接（从一个堆叠端口出发，依自向下连接即可画出两组连接）就实现了所有交换机的堆叠连接，并
+	最终形成一个封闭的连接环路，实现连接的冗余性。
+	    1.电缆连接的是两台交换机的相同序号（STACK 1—STACK 1，STACK2--STACK2）SATCK 接口
+
+
+        方式二：使用 0.5 米和 3 米两种规格 StackWise 堆叠电缆进行的两种堆叠连接方式。左右两种连接方式都提供了一个封闭的环形连接，实现连接的冗余性。
+
+		1.用0.5 米电缆连接的都是不同交换机上相同序号的堆叠接口，3 米的电缆连接的是上、下级交换机中不同序号的 STACK 接口
+		2.用0.5 米电缆连接的都是不同交换机上不同序号的堆叠接口，3 米的电缆连接的是上、下级交换机中不同序号的 STACK 接口
+
+	方式三：用1米的电缆用来连接相邻交换机的堆叠接口，3米的电缆是用来连接第一台和最后一台的堆叠接口，以形成一个封闭的环路。
+
+	总结：从以上几种堆叠连接方式可以看出，IOS 交换机的堆叠连接都是串联方式，无论你连接的是相同序号 STACK 接口，还是不同序号的 STACK 接口。而且堆叠连接必须要在最后能形成一个封闭的连接环，这样可确保堆叠连接的冗余性，不管其中任何一条连接电缆中断了，都不
+	影响整个堆叠连接。
+
+	交换机中的全带宽和半带宽堆叠连接在 Cisco IOS 交换机的 StackWise 堆叠连接中，依据其堆叠性能和可冗余特性划分为两种连接类型，那就是我们常用的全带宽连接（full bandwidth connections）和半带宽连接（halfbandwidth connections）。
+
+	全带宽（2*32 Gb/s=64 Gb/s）连接，就是堆叠成员交换机中所有 StackWise 端口都参与了连接，充分利用了各堆叠端口的带宽性能（相当于全双工模式），最终形成了上节提到的全封闭连接环（第一台交换机的 STACK 1→第二台交换机的 STACK 1→第二台交换机的STACK 2→第三台交换机的 STACK 1→第三台交换机的 STACK 2→第一台交换机的 STACK 2），
+	并提供连接冗余性能。即使其中任何一条电缆连接中断了，堆叠中的三台交换机仍可以实现相互通信，只不过此时它只能实现半带宽连接，而且不能提供连接冗余特性，
+    半带宽是全带宽的特殊情况。
+
+    通过以下命令可以查看到相关交换机堆叠相关状态
+	show switch stack-ports
+	show switch neighbors
+
+Combo接口又叫光电复用接口，是由设备面板上的两个以太网口（一个光口和一个电口）组成。Combo电口与其对应的光口在逻辑上是光电复用的，用户可根据实际组网情况选择其中的一个使用，但两者不能同时工作。
+交换机上Combo接口的判断方法如下：
+ 通过交换机面板判断，接口标识编号相同，但是传输介质（光和电）不同的一对接口，即为Combo口。图1-1的1和2分别代表一个Combo接口。
+图1-1 Combo接口示意图
+说明：
+V100R003及之前的版本：Combo接口默认类型为光口。
+V100R005及以后版本：缺省情况下，Combo接口模式为Auto，表示自动选择接口模式，接口会检测是否有光模块插入： 如果电口和光口均没有插入网线和光模块，则以时间作为优先级，即如果先插入电口，则优先选择电口作为数据交换接口，如果先插入光口，则优先选择光口作为数据交换接口。
+ 如果电口已经插入网线，且接口处于UP状态，当光口插入光模块时，仍选择电口模式。
+ 如果光口已经插入光模块，无论接口是否处于UP状态，当电口插入网线时，仍选择光口模式。
+ 如果电口和光口均已插入网线和光模块、光纤，设备重启后，将选择光口模式。
+1.如何判断交换机的物理口为Combo口
+（1）通过交换机面板判断，接口标识与编号相同，且介质不同的一对端口即为combo口
+（2）通过命令行查看，display interface interface-type x/x/x
+例如：
+[Quidway]display interface 2/0/0
+GigabitEthernet2/0/0 current state : DOWN
+Line protocol current state : DOWN
+Switch Port, PVID : 1001, TPID : 8100(Hex), The Maximum Frame Length is 9216
+IP Sending Frames' Format is PKTFMT_ETHNT_2, Hardware address is 4c1f-cc7c-8251
+Last physical up time: -
+Last physical down time : 2012-06-29 10:32:19
+Current system time: 2012-06-29 10:35:39
+Port Mode: COMBO AUTO                                    // 表示接口为Combo类型，为自动切换                                                    
+Current Work Mode: COPPER                            // 表示目前接口为电口模式                                                     
+Speed : 1000,Loopback: NONE
+Duplex: FULL,Negotiation: ENABLE
+Mdi: AUTO
+……
+2、交换机Combo默认类型与转换命令总结：
+（1）V100R003以及之前的版本，Combo口默认类型为光口；
+（2）V100R005以及以后的版本， Combo口默认类型为自动切换，接口类型先插先用。
+转换命令：接口视图下执行combo-port { auto（自动） | copper（电口） | fiber （光口）}。
+
+
+
+
+SFP
+   SFP就是光模块。
+
+   GBIC(Gigabit Interface Converter的缩写)，是将千兆位电信号转换为光信号的接口器件。GBIC设计上可以为热插拔使用。GBIC是一种符合国际标准的可互换产品。采用GBIC接口设计的千兆位交换机由于互换灵活，在市场上占有较大的市场份额。SFP （Small Form-factor Pluggable）可以简单的理解为GBIC的升级版本。商用SFP收发器能够提供速率达到4.25 Gbps。
+   10 Gbps 收发器的几种封装形式为XFP，以及与SFP封装基本一致的新的变种"SFP+"。
+QSFP:
+　　Quad Small Form-factor Pluggable
+　　四通道SPF接口(QSFP)，QSFP是为了满足市场对更高密度的高速可插拔解决方案的需求而诞生的。
+　　这种4通道的可插拔接口传输速率达到了40Gbps。很多XFP中成熟的关键技术都应用到了该设计中。
+　　QSFP可以作为一种光纤解决方案，并且速度和密度均优于4通道CX4接口。
+　　由于可在XFP相同的端口体积下以每通道10Gbps的速度支持四个通道的数据传输，所以QSFP的密度可以达到XFP产品的4倍，SFP+产品的3倍。具有4通道且密度比CX4高的QSFP接口已经被InfiniBand标准所采用。
+
+QSFP+:
+	 Quad Small Form-factor Pluggable Plus 
+	 四小体积可插入(QSFP +)的解决方案是专为高密度的应用程序。系统组件的包括电磁干扰(EMI)屏蔽,活跃的光缆(AOC)、被动铜电缆组件,活跃的铜电缆组件,光学MTP电缆组件,光学回环,主机连接器,连接器和笼子层叠式集成。
+	 SFF - 8436的文档指定一个无线电收发机机械形式因素与闭锁机制,host-board electrical-edge连接器和接口。热插拔的收发器集成了4传送和接收通道4。莫仕的QSFP +收发器可以取代4标准SFP +收发器。结果是更大的端口密度和整个系统的成本节约超过传统SFP +产品。QSFP +线缆组件被设计提供叠起来连接器配置在极高密度的需求。这个系统将支持10 G以太网,光纤道,InfiniBand *,SAS和SONET / SDH标准使用不同的数据率选项。包括InfiniBand *单独的数据率(SDR),双数据率(DDR)和四数据率(报告),以太网系统(10 ~ 40 gbp s),光纤通道(8、10 gbp s),SAS(12 gbp s)。
+
+   1．配置logging:
+
+R2(config)#logging on  开启logging服务（默认是开启的）
+R2(config)#logging buffered   开启本地记录功能
+R2(config)#logging buffered 9090   定义本地存储器的空间大小（单位Byte）
+R2(config)#logging buffered errors 定义可以存储的日志级别为3 errors,（默认7 debugging）
+  <0-7>              Logging severity level
+  alerts             Immediate action needed           (severity=1)
+  critical           Critical conditions               (severity=2)
+  debugging          Debugging messages                (severity=7)
+  emergencies        System is unusable                (severity=0)
+  errors             Error conditions                  (severity=3)
+  informational      Informational messages            (severity=6)
+  notifications      Normal but significant conditions (severity=5)
+  warnings           Warning conditions                (severity=4)
+  xml                Enable logging in XML to XML logging buffer
+  <cr>
+R2(config)#logging host 172.25.1.1 
+R2(config)#logging trap ?   定日志级别，可选的级别有0－7共八个级别，0最高，7最低。这八个级别分别为：
+  <0-7>          Logging severity level
+  alerts         Immediate action needed           (severity=1)
+  critical       Critical conditions               (severity=2)
+  debugging      Debugging messages                (severity=7)
+  emergencies    System is unusable                (severity=0)
+  errors         Error conditions                  (severity=3)
+  informational  Informational messages            (severity=6)
+  notifications  Normal but significant conditions (severity=5)
+  warnings       Warning conditions                (severity=4)
+debugging级别越低记录的日志越详细,限制特定日志记录发送至服务器
+
+R2(config)#logging source-interface Loopback0   设定 Syslog 消息的源地址使用特定地址
+R2(config)#logging facility local6   定义远程存储类型为local6
+本地设备定义远程服务器的IP地址，并且在远程服务器上，需要知道远程的存储类型，称为facility，要事先了解清楚，通常我们使用的有local0 local1 local2 local3 local4 local5 local6 local7 共8个类型，默认为local7。
+(config)#logging count
+
+查看日志：
+#sh logging
+#show logging count
+
+
+#snmp-server packetsize 1480
+
+ NTP认证
+
+    服务器和客户端之间可以使用MD5来提供安全认证，只有双方在密码相同的情况下，时间才能同步，双方可以同时配置多个key，号码也可以不一样，但当前使用的的key密码必须是相同的，否则时间不能同步。
+
+    配置
+
+   1．配置NTP服务器：
+
+    （1）开启认证
+
+         R1(config)# ntp authenticate
+
+    （2）配置密码
+
+         R1(config)# ntp authentication-key 5 md5 cisco
+
+    （3）使用某个密码 注：在key只有一个的情况下，可以不配
+
+         R1(config)#ntp trusted-key 5
+
+         R2(config)# clock timezone GMT +8
+
+  2．配置NTP Client;
+
+    (1) 开启认证
+
+        R2(config)#clock timezone GMT +8        设置时区为东8区时
+        R2(config)# ntp authenticate
+
+   （2）配置密码
+
+        R2(config)# ntp authentication-key 20 md5 cisco
+
+   （3）使用某个密码
+
+        R2(config)#ntp trusted-key 20
+
+   （4）打开对服务器的密码使用，让发送给服务器的数据中携带密码
+
+        R2(config)#ntp server 10.1.1.1 key 20
+
+   （5）配置NTP数据包的源地址：
+
+        注：此地址为数据发出时的源地址，并不影响NTP时间同步
+
+        R1(config)#ntp source Loopback0
+
+  3.查看结果
+
+   （1）未同步的：
+
+        R2#sh ntp status
+
+           Clock is unsynchronized, stratum 16, no reference clock
+
+        R2#show ntp association detail 
+
+           12.0.0.1 configured, insane, invalid, unsynced, stratum 16
+
+  （ 2）已同步的：
+
+        R2#sh ntp status
+
+           Clock is synchronized, stratum 6, reference is 127.127.7.1
+
+        R2#sh ntp associations detail
+
+           10.1.1.1 configured, authenticated, our_master, sane, valid, stratum 6
+   （3）查看结果：
+
+        #show clocks是软件时钟
+
+        #show calendar是硬件时钟
+
+        NTP同步只同步时间不会同步时区
+
+ssh配置
+
+R1#show ip ssh
+SSH Disabled - version 1.99
+%Please create RSA keys to enable SSH (and of atleast 768 bits for SSH v2).
+
+R2(config)#hostname R2
+R2(config)#ip ssh time-out 120     //修改超时时间
+R2(config)#ip ssh authentication-retries 1     //修改重认证次数。
+R2(config)#ip ssh version 2          //修改版本
+R2(config)#ip domain-name cisco.com   //配置域名为cisco.com
+R2(config)#crypto key generate rsa   //生成 RSA 密钥对将自动启用 SSH。
+  general-keys  Generate a general purpose RSA key pair for signing and
+                encryption   
+  usage-keys    Generate separate RSA key pairs for signing and encryption
+  <cr>
+R2(config)#username cisco privilege 15 secret cisco  给本地用户设置用户名和密码
+R2(config)#line vty 0 4
+R2(config-line)#transport input ssh      //启用SSH登陆
+R2(config-line)#login local              Local password checking
+
+
+
+R1#ssh -v 2 -l cisco 10.1.1.2
+Password: 
+R2#
+R2#
+
+R2(config)#username redhat secret cisco   //在本地创建一个用户名为redhat并且设置密文加密的密码cisco。
+R2(config)#enable secret cisco     设置enable密码
+R1#ssh -v 2 -l redhat 10.1.1.2
+Password: 
+R2>en
+Password: 
+R2#
+R2#
+# crypto key zeroize rsa 移除密钥对
+snmp配置
+
+snmp-server community public ro     #设置只读字符串,public为团体名称,ro为只读
+snmp-server trap-source FastEthernet0/3/0    #监控的端口
+snmp-server host x.x.x.x version 2c public    #在哪台终端上应用共同体# SNMP采用版本2，public作为团体名称
+snmp-server enable traps               #启用snmp
+
+
+
+
+
+flash:/ 放的是cisco的IOS系统文件
+nvram:/  放的是启动时自动加载的配置文件，也就是startup-config 。 非易失性内存
+system:/  也就是交换机/路由器的内存ram，放的是当前运行的配置文件，即running-config。易失性内存
+copy  running-config startup-config 命令，简称 copy run start  就是把当前的配置保存在NVRAM中，以便于下一次交换机重启时可以应用最新的配置。
+在特权模式下使用dir flash:/ 可以查看IOS文件信息，同理可以查看其他存储介质内的信息。
+
+U是一种表示服务器外部尺寸的单位(计量单位：高度或厚度)，是unit的缩略语，详细的尺寸由作为业界团体的美国电子工业协会（EIA）所决定。
+1U=4.445*1=4.445厘米
+
+
+交换机的包转发率标志了交换机转发数据包能力的大小。单位一般位pps（（packets per second）），
+48G是（背板带宽）交换容量， 入24，出24.
+1Gbps 就是 1.48Mpps（64Byte小包）， 24*1.48 = 35.7Mpps 
+Mpps越大， 说明吞吐量越大。
+
+包转发线速的衡量标准是以单位时间内发送64byte的数据包（最小包）的个数作为计算基准的。对于千兆以太网来说，计算方法如下：1，000，000，000bps/8bit/（64＋8＋12）byte=1,488,095pps 
+说明：当以太网帧为64byte时，需考虑8byte的帧头和12byte的帧间隙的固定开销。故一个线速的千兆以太网端口在转发64byte包时的包转发率为1.488Mpps。
+快速以太网的线速端口包转发率正好为千兆以太网的十分之一，为148.8kpps。
+*对于万兆以太网，一个线速端口的包转发率为14.88Mpps。
+*对于千兆以太网，一个线速端口的包转发率为1.488Mpps。
+*对于快速以太网，一个线速端口的包转发率为0.1488Mpps。
+*对于OC－12的POS端口，一个线速端口的包转发率为1.17Mpps。
+*对于OC－48的POS端口，一个线速端口的包转发率为468MppS。
+
+以机箱式交换机为例
+1、机箱，主要是承载各体系模块的载体，包含有背板，提供各模块交换通信的通路。另外提供业务板卡插槽。
+2、电源，用途就是供电。有1+1或者N+1备份方式。
+3、引擎，也有的叫矩阵。是交换机的核心体，提供各板卡（接口模块）之间的数据转发、路由交换、过滤、策略等功能。一般核心交换机均可支持双引擎冗余配置。功能其实和汽车的引擎 没有引擎就没有办法启动。
+4、接口模块（板卡），也有的叫业务模块。就是连接用户终端或者下一级网络设备的接口板。有各种不同类型接口，比如100M、1000M、10G、ATM、电口光口等等类型。根据用户需求进行不同类型接口板卡和数量配置。
+有些接口模块只是简单的I/O通道模块，但现在大部分交换机的板卡均具有本地交换功能。
+5、功能模块。是业务模块特殊的一种，有些交换机还提供有此类功能模块，不一定有用户端口，但主要用于提供增强功能，比如防火墙模块，路由模块等等。
+EPLD镜像软件提供了交矩阵的启动，连接业务板卡。
+
+PRTNR SS 8X5XNBD C1 ISR 4451 (4GE,3NIM,2SM,8G FLASH)
+
+ISR 集成服务路由器
+4G MEIGE NIM插槽向路由处理器和其它模块插槽提供高达2Gbps数据吞吐功能
+3NIM3个网络接口模块
+2SM-X 带X表示2个增强型服务模块
+8G FLASH 8G闪存
+ISC 集成服务卡
+
+N9K-X9736C-FX
+
+100Base-TX 、100Base-FX 中的“ X ”是没有单独意思
+"100"用单位MHz (Megahertz)表示网线设计的频率。即，100 MHz。MHz的值越大，网线所支持的速度就越快。
+
+“Base”指的就是基带。基带是以太网使用的一种通信类型，同时它还意味着计算机使用的是所有可用的带宽进行传输，
+T”指的是承载信号的物理介质“双胶线”。它显示了网线的结构并指出包含的绞线对的数量。
+100 Base-T=100Base-TX
+TX是一个CAT5 UTP直通线，它使用四对绞线中的两对，并且支持最高达到100Mb的速度。最大长度是100米，并且在节点间的最小长度是2.5米
+
+
+
+锐捷
+光电复用口默认为使用电口，若要使用光口，则进行如下配置：
+Ruijie(config-GigabitEthernet 0/0)#media-type basex force
+注：baset代表电口、basex代表光口。
+
+H3C
+使用interfere命令进入接口
+h3c(config-GigabitEthernet 0/0)#combo enable fiber   启动光口
+h3c(config-GigabitEthernet 0/0)#combo enable copper  启用电口
+
+
+一 、定义AAA策略
+1. 认证配置 
+Router1#configure terminal 
+Router1(config)#aaa new-model 
+Router1(config)#aaa authentication login default group tacacs+ local  定义认证默认的策略名字为default，登录认证默认为采用先ACS服务器再本地验证（当ACS服务器不可达才用本地数据库验证）
+R2(config)#aaa authentication login default local-case  定义认证默认的策略名字为default，，登录使用本地认证数据库做认证登录 case表示关注用户名和密码的大小写
+
+
+2、配置授权
+Router1(config)#aaa authorization exec default group tacacs+  local  定义授权用户进入特权模式，策略名称为default，给用户通过tacas服务器授权 ，否则，通过本地数据库做授权
+Router1(config)#aaa authorization commands 15 default group tacacs+ 定义授权的命令等级为15级，策略名称为default，给用户通过tacas服务器授权
+
+3、配置tacacs-server 
+Router1(config)#tacacs-server host 10.253.100.100
+Router1(config)#tacacs-server key cisco
+
+4. 记录用户行为审计 
+记录用户输入的配置命令和时间 
+Router1(config)#aaa accounting commands 15 default start-stop  group tacacs+ 定义审计的命令等级为15级，默认策略名default，调用tacas服务器做审计
+Router1(config)#aaa accounting exec default start-stop group tacacs+ 
+Router1(config)#aaa accounting connection default start-stop group tacacs+ 
+
+
+二、调用策略到接口下  （default策略默认将自动应用到所有线路上，自我命名的策略需要在接口下敲命令去调用）
+1.在telnet实施认证与授权
+Router1(config)#line vty 0 4
+Router1(config-line)#login authentication default  设置telnet登陆采用ACS服务器的用户名和密码，登陆成功，当ACS服务器不可达时，才会用本地数据库验证，）
+Router1(config-line)#authorization exec default  调用策略名字为default的用户进入特权模式。
+Router1(config-line)#accounting connection default
+Router1(config-line)#accounting commands 15 default
+Router1(config-line)#accounting exec default
+
+
+
+案例：
+aaa new-model
+ tacacs-server host 11.24.201.73 key aaamasterkong
+ aaa authentication login bluexvty group tacacs+ local line none
+ aaa authorization config-commands
+ aaa authorization exec bluexvty group tacacs+ local
+ aaa authorization commands 0 bluexvty group tacacs+ local
+ aaa authorization commands 1 bluexvty group tacacs+ local   
+ aaa authorization commands 5 bluexvty group tacacs+ local
+ aaa authorization commands 15 bluexvty group tacacs+ local
+ aaa accounting exec bluexvty start-stop group tacacs+ 
+ aaa accounting commands 0 bluexvty start-stop group tacacs+
+ aaa accounting commands 1 bluexvty start-stop group tacacs+
+ aaa accounting commands 5 bluexvty start-stop group tacacs+
+ aaa accounting commands 15 bluexvty start-stop group tacacs+
+ aaa authentication login bluexconsole local
+ line vty 5 10 
+   login authentication bluexvty
+   authorization commands 15 bluexvty
+   authorization exec bluexvty
+   accounting exec bluexvty
+   accounting commands 0 bluexvty
+   accounting commands 1 bluexvty
+   accounting commands 5 bluexvty
+   accounting commands 15 bluexvty
+   exit
+ line console 0 
+   login authentication bluexconsole
+   exit
+
+firepower 2130 配置详解
+
+firepower4110 防火墙机框和ASA之间切换
+PFR-4110-A# 
+PFR-4110-A# connect module 1 console   进入ASA模式
+ciscoASA# 
+
+firepower2130 防火墙机框和ASA之间切换
+PFR-2130-A# 
+PFR-2130-A# connect asa   进入ASA模式
+ciscoASA# 
+
+ASA模式和firepower模式之间来回切换  通过Ctrl + A + D
+
+Firepower-module1> 通过shift +~ 或 键盘insert
+telnet> quit
+Connection closed.
+PFR-4110-A# 
+
+
+
+ASA防火墙主备配置：
+
+interface GigabitEthernet1/1
+description TO_DD-F2N1C03-WAN-BLFW-01_G1/1
+channel-group 3 mode active
+no shutdown
+
+interface GigabitEthernet1/2
+description TO_DD-F2N1C03-WAN-BLFW-01_G1/2
+channel-group 3 mode active
+no shutdown
+
+
+interface Port-channel3
+                                                                                                     
+interface port-channel 3.1
+description FO Interface
+vlan 1
+no shutdown
+
+interface port-channel 3.2
+description SA Interface
+vlan 2
+no shutdown
+
+failover
+failover lan unit primary/secondry   在主的上配置primary，备的上配置secondry
+failover key bankofdl
+failover lan interface FO port-channel3.1
+failover interface ip FO 55.0.0.5 255.255.255.252 standby 55.0.0.6
+failover link SA port-channel3.2
+failover interface ip SA 55.0.0.9 255.255.255.252 standby 55.0.0.10
+
+之后备机会同步主机相关配置，但是不会同步 startup-config，保险起见主备机同步完成之后需要执行 wr 相互保存设置
+
+查看命令：
+show failover state
+
+failover 用于故障切换
+failover link同步的信息有，配置，设备状态，hello包，电源等等
+stateful 带状态的故障切换
+stateful link同步的信息有：NAT表、TCP会话、UDP会话、ARP表等等
+主设备故障，备设备会话保持连接，不会中断
+
+ASA添加策略：
+策略示例一：
+# object-group network ECC_PC
+     network-object host 10.190.172.0/22
+# object-group network old_TA_BaoLeiJi
+     network-object host 188.188.8.240
+# object-group service oldtabljTCP tcp
+     port-object eq ssh
+     port-object eq 3389
+     port-object eq 10050
+     port-object eq 10000
+     port-object eq 3306
+     port-object eq https
+# access-list in-out extended permit tcp object-group ECC_PC object-group old_TA_BaoLeiJi object-group oldtabljTCP 
+注意：在access-list中3个object-group的含义如下
+object-group     Network object-group for source address
+object-group     Network object-group for destination address
+object-group     Optional service object-group for destination port
+注意：object-group NAME必须不相同
+
+策略示例二：
+# object-group network ECC_PC
+    network-object host 10.190.172.0/22
+# object-group network GDSJ
+    network-object host 192.168.0.195
+# access-list in-out extended permit tcp object-group ECC_PC object-group GDSJ eq 7080
+注意：可以通过一下多种方式来做服务模式匹配
+eq               Port equal to operator
+gt               Port greater than operator
+inactive         Keyword for disabling an ACL element
+log              Keyword for enabling log option on this ACL element
+lt               Port less than operator
+neq              Port not equal to operator
+
+
+SSH配置
+
+管理口配置：
+interface Management1/1
+ management-only
+ nameif management
+ security-level 0
+ ip address 10.254.202.51 255.255.255.0 standby 10.254.202.52 
+
+route management 0.0.0.0 0.0.0.0 10.254.198.254  带外路由
+
+ciscoasa(config)#crypto key generate rsa   (创建RSA密钥，默认是1024bit） //指定rsa系数的大小,这个值越大,产生rsa的时间越长,cisco推荐使用1024.
+ciscoasa(config)#ssh 0.0.0.0 0.0.0.0 management
+//0.0.0.0 0.0.0.0 表示任何外部主机都能通过SSH访问management接口,当然你可以指定具体的主机或网络来进行访问,management也可以改为inside或outside即表示内部通过SSH访问防火墙
+ciscoasa(config)#ssh timeout 30 //设置超时时间,单位为分钟
+ciscoasa(config)#ssh version 1   //指定SSH版本,可以选择版本2
+        
+用本地用户认证的配置如下：
+username localadmin password cisco privilege 15
+aaa authentication SSH console LOCAL
+
+客户端ssh到防火墙，例如是router：
+outside#ssh -l admin ?
+  -c    Select encryption algorithm
+  -m    Select HMAC algorithm
+  -o    Specify options
+  -p    Connect to this port
+  -v    Specify SSH Protocol Version
+  WORD  IP address or hostname of a remote system
+
+outside#ssh -l admin 20.1.1.1
+Password:
+
+查看命令
+show ssh                           //参看SSH配置信息
+show crypto key mypubkey rsa    //查看产生的rsa密钥值
+crypto key zeroize               //清空所有产生的密钥
+
+
+interface GigabitEthernet1/7
+description TO_F2N1C03-WAN-01_G1/27
+channel-group 1 mode active
+no shutdown
+
+interface GigabitEthernet1/8
+description TO_F2N1C03-WAN-02_G1/27
+channel-group 1 mode active
+no shutdown
+
+interface port-channel 1
+lacp max-bundle 8
+port-channel load-balance vlan-src-dst-ip-port
+nameif inside
+security-level 100
+ip address 11.190.62.1 255.255.255.240 standby 11.190.62.2
+no shutdown
+
+
+SNMP和syslog配置
+
+snmp-server host management 10.254.160.32 community DLBankSNMP version 2c
+snmp-server enable traps all
+logging host management 10.254.160.32
+logging trap warnings
+logging device-id hostname
+logging enable
+logging timestamp
+
+
+
+netflow配置
+netflow是
+
+在全局模式下：
+ip flow-export source GigabitEthernet0/0/0 使用源ip地址作为ip地址的UDP数据报文发送给目标主机netflow
+ip flow-export version 9 指定netflow版本
+ip flow-export destination 182.22.11.240 9996 指定netflow目标主机的ip地址或主机名，和监听的端口号
+ip flow-sampling-mode packet-interval 100 指定netflow采样间隔为100:1
+
+在接口配置模式下，调用netflow
+interface GigabitEthernet10/0
+ip route-cache flow sampled
+ip flow ingress
+ip flow egress
+
+
+查看netflow数据流量输出
+show ip flow export 显示ip流出口
+show ip flow export template 显示ip流量导出模板
+
+
+
+使用telnet测试端口连通性
+
+端口已打开
+<DD-BD3#2F-DEV-AS-01>telnet 10.188.96.104 53
+Trying 10.188.96.104 ...
+Press CTRL+K to abort
+Connected to 10.188.96.104 ...
+
+Info: The connection was closed by the remote host.
+提示按CTRL+K终止此操作。
+
+端口未打开
+<DD-BD3#2F-DEV-AS-01>telnet 10.188.96.104 12
+Trying 10.188.96.104 ...
+Press CTRL+K to abort
+Error: Failed to connect to the remote host.
+有错误提示：远程连拒绝。
+
+   
+
+

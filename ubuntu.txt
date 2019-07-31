@@ -1,0 +1,65 @@
+
+程序支持Linux系统(Ubuntu Fedora)和MacOSX 多平台.
+1、软件下载
+
+    百度云链接: 链接：https://pan.baidu.com/s/1SFKIriSxI4eFrokf3-fz2g 
+提取码：hsyd 
+
+
+2、软件安装
+
+    安装secureCRT
+
+    sudo dpkg -i scrt-8.5.3-1867.ubuntu18-64.x86_64.deb 
+
+3、下载运行破解脚本
+    wget http://download.boll.me/securecrt_linux_crack.pl
+    sudo perl securecrt_linux_crack.pl /usr/bin/SecureCRT
+
+    显示如下内容：
+
+提示如下：
+crack successful
+License:
+
+	Name:		xiaobo_l
+	Company:	www.boll.me
+	Serial Number:	03-94-294583
+	License Key:	ABJ11G 85V1F9 NENFBK RBWB5W ABH23Q 8XBZAC 324TJJ KXRE5D
+	Issue Date:	04-20-2017
+
+4. 启动securecrt程序
+	/usr/bin/SecureCRT
+然后可以看到启动中打开SecureCRT，安装上边显示的内容输入对应的信息。就破解了
+
+
+ubuntu deepin-wine安装windows应用
+
+# 下载deepin-wine 环境
+git clone https://github.com/wszqkzqk/deepin-wine-ubuntu.git
+# 切换目录
+cd deepin-wine-for-ubuntu
+    ## 切换到root账户
+    su 
+    ./install.sh
+    # OR
+    ##sudo运行安装
+    sudo ./install.sh
+
+以下下载链接摘自
+deepin-wine-ubuntu
+
+QQ
+TIM
+QQ轻聊版
+微信
+Foxmail
+百度网盘
+360压缩
+WinRAR
+迅雷极速版
+
+# 安装应用
+## 安装需要超级用户权限
+dpkg -i ***.deb
+## 当然，你也可以双击 然后install

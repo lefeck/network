@@ -1,0 +1,87 @@
+nexus:
+
+snmp-server host 10.254.160.32 traps version 2c DLBankSNMP
+snmp-server community DLBankSNMP ro
+snmp-server enable traps
+snmp-server host 10.254.160.32 use-vrf management
+snmp-server host 10.254.160.32 source-interface mgmt0
+logging server 10.254.160.32 4 use-vrf management
+logging origin-id hostname
+logging timestamp microseconds
+logging level local7 4
+
+ciscoÂ·ÓÉÆ÷:
+
+snmp-server community DLBankSNMP RO
+snmp-server trap-source GigabitEthernet0
+snmp-server host 10.254.160.32 version 2c DLBankSNMP
+snmp-server host 10.254.160.32 vrf Mgmt-intf version 2c DLBankSNMP
+snmp-server enable traps
+logging trap warnings
+logging source-interface GigabitEthernet0 vrf Mgmt-intf
+logging host 10.254.160.32 vrf Mgmt-intf
+
+
+cisco3650:
+
+snmp-server community DLBankSNMP RO
+snmp-server trap-source GigabitEthernet0/0
+snmp-server host 10.254.160.32 version 2c DLBankSNMP
+snmp-server host 10.254.160.32 vrf Mgmt-vrf version 2c DLBankSNMP
+snmp-server enable traps
+logging trap warnings
+logging source-interface GigabitEthernet0/0 vrf Mgmt-vrf
+logging host 10.254.160.32 vrf Mgmt-vrf
+
+===========================================================================
+
+ASA:
+snmp-server host management 10.254.160.32 community DLBankSNMP version 2c
+snmp-server enable traps all
+logging host management 10.254.160.32
+logging trap warnings
+logging device-id hostname
+logging enable
+logging timestamp
+
+
+firepower:
+scope system
+scope service
+enter ip-block 10.254.0.0 16 snmp
+commit-buffer
+end
+
+scope monitoring
+enable snmp
+set snmp community
+DLBankSNMP
+commit-buffer
+
+creat snmp-trap 10.254.160.32
+set notificationtype traps
+set port 162
+set version v2c
+set community
+DLBankSNMP
+commit-buffer
+
+enable syslog remote-destination server-1
+set syslog remote-destination server-1 level warnings hostname 10.254.160.32 facility local7
+commit-buffer
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

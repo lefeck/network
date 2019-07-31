@@ -1,0 +1,320 @@
+　VPC(virtual PortChannel，虚拟链路聚合)  技术允许将连接到两个Nexus系列交换机的物理链路视作一条逻辑端口聚合链路，再连接到其他设备。其他设备包括：Nexus 2000 系列的 Fabric Extender（后文暂且翻译为结构扩展器），交换机，服务器等其他任何的网络设备。vPC技术可以提供二层的多路径选择，让用户可以在有多条可选路径的情况下增加网络冗余度，同时实现提升带宽、在多个节点之间启用多条并行路径和对流量进行负载均衡。
+	在你开启vPC功能之后，你需要创建一条对端存活检测(keepalive)链路，用于在设备之间发送心跳。
+vPC 域内包含vPC端设备，vPC对端keepalive链路，vPC对端互联链路，以及所有在vPC域下的PortChannel。在每个设备上你最多只能指定一个vPC域。
+	vPC功能提供了如下这些好处：
+		允许单个设备用portchannel连接到两个不同的上游设备
+		消除因为生成树协议而产生的阻塞端口
+		提供无环拓扑
+		可以使用所有可用的上行链路
+		当有链路或者设备失效的时候实现快速收敛
+		帮助实现高可用性
+
+	vPC概念
+		下面的列表定义了最关键的vPC概念：
+		vPC： 不同vPC端设备上与下游设备之间的捆绑PortChannel
+		vPC peer Switch(vPC端交换机)：连接到vPC对端互联链路的交换机。其中一个设备会被选举为主设备，另外一个设备会成为从属设备。
+		vPC peer link(vPC对端互联链路)：用于在vPC端交换机同步状态的链路。二层链路，承载控制层面流量，泛洪流量，孤立端口流量
+		vPC domain(vPC域)：包括vPC端设备，vPC对端存活检测链路和所有连接往下游设备的PortChannel。 同域内只支持两台设备，建立两端的Domain ID一致
+		vPC keepalive link（vPC对端存活检测链路）：三层链路，承载心跳数据包，检测vPC端交换之间的存活状态。
+		vPC member port（vPC成员端口）：归属于vPC的交换机端口。
+		Orphan Port //孤立端口
+		CFS（Cisco fabric services）  peer link 上运行的协议，用于两设备间状态同步，配置确认 。注意不能检测配置是否正确。
+
+    2. VPC控制层面和数据层面
+
+	VPC控制层面：CFS用于同步VPC控制层面信息
+		MAC地址学习
+		配置一致性检测
+		VPC成员端口状态
+		ARP缓存
+
+	VPC数据层面：VPC Peer Link承载流量
+		VPC控制层流量
+		泛洪流量
+		孤立端口流量
+		流量转发限制：从Peer Link进入vPC对等体的帧不会通过vPC成员端口转发
+
+
+
+peer-switch详解
+
+		peer-switch主要把2端设备生成树的优先级做成一致，2台设备都会认为自己是根，都会发送bpdu。当主设备失效的时候，备设备会一直发送bpdu。不会有中断过程。
+		当active恢复的时候，备设备的角色因为没有变化，也不会有影响。
+		需要用相同的mac地址（用vpc的system mac地址替代本地mac）作为根的mac地址，可以通过show vpc role 看到，这样才能保证传输的bpdu是一样的。
+
+		当vpc设备出现问题时，可能有2个地方stp会导致业务中断：
+			1 当active失效的时候，备设备可能由于自身原因导致bpdu传输不稳定，导致生成树的重新收敛。
+			2 当active恢复的时候，由于备设备的root port状态变化，会发出同步消息，导致端口临时block。
+		当主设备恢复之后，由于vpc不抢占，原来的主会工作在standby状态。
+		但是由于原来的active 的stp优先级配置的更低，会把stp的根抢占回来。
+		这时候stp的root port会发出sync，所有的非终端接口会临时的block直到同步完成，可能会导致业务中断
+
+		解决这两种情况，可以使用peer-swtich。
+
+
+Peer-Gateway
+
+		允许一个VPC交换机为那些去往对端peer MAC的数据包扮演一个Active网关；
+		解决VPC设计中三层对VPC的影响：启用此特性后7K2，将不会把R发送的去往S的，下一跳MAC是7K1 MAC的数据包通过peer link发送到7K1，而是自己充当网关，直接将数据包转发出去；
+		推荐配置此feature；
+		将peer-gateway就是把peer充当网关，本地转发的意思
+
+vPC Peer-Gateway Exclude-Vlan 
+只在下图所示的拓扑环境中使用（M卡F卡混合机箱配置，同时peer link在F1卡上），如果是纯的F1、M1或F2环境都不需要配置此feature；Peer Link使用M1卡的环境下也不需要此feature；
+此feature的作用是防止数据流量经过peer link转发时被punted到CPU，直接使用硬件转发；在混合机箱配置模式且F1卡作为peer-link的情况下，通过peer-link的IP/ARP数据包将会使用tunneling机制，实际上是使用的CPU进行软件的方式转发，会受到系统COPP的影响，可能造成丢包；
+使用的情况是：在所有的L3 link DOWN后，数据经过peer link的备用路由进行转发；
+推荐设计：如果有在peer link上使用特定的VLAN作为备份路由，始终开启此feature；
+
+
+
+必须要使用下面命令声明可以在peer link上传送的VLAN：
+N7k(config-vpc-domain)# peer-gateway exclude-vlan <vlan list> 
+
+
+
+
+vPC与FHRP(First Hop Redundancy Protocol)
+
+		HSRP的Active和Standby都可以直接转发流量，Standby下联端口接收到的流量不会经过Peer Link到Active去转发；
+		VPC下的HSRP是双active的，不需要额外的配置；
+		因为流量不经过peer link转发，所以peer link的容量不需要随着VPC数量的增加而增加；
+		配置FHRP的SVI接口在路由中需要配置passive，这样避免通过peer link建路由邻居；
+		在两个VPC peer之间建立点到点的路由协议邻居关系，这样当上行链路出现故障时，可以通过peer之间的三层路由转发数据（备用链路）；
+		在2台7K上分别show hsrp group xx可以看到虽然有主备，但是它们的Virtual MAC Adress是相同的；
+		从数据层面来看，2台设备都是HSRP active是在HSRP的VMAC上增加了一个G bit(Gateway bit)，可以通过show mac address-table address xxxx(vmac)来查看(active的port指的是sup-eth1(R)，standby指的是 vPC peer-link(R))；
+
+		最佳实践：
+		HSRP计时器保持默认；
+		VPC的SVI接口在路由协议中passive，防止在peer link上建立L3邻居关系；
+		VPC primary做为HSRP的active，secondary作为standby；
+		关闭IP重定向(no ip redirect)
+
+
+6.数据中心内VPC拓扑设计
+Single-sided vPC（接入层或汇聚层）；
+Double-sided vPC，或者叫做多层VPC；
+
+		Single-sided vPC
+		接入层设备双上联到2台VPC peer；
+		支持最大160G上联带宽(16*10GE)：
+
+		Double-sided VPC架构
+		M卡，每个对等体支持8条active链路(从每个设备出来都是8条链路，接入设备总共8条上联链路，4条到N7K-1，4条到N7K-2)；2个vPC对等体之间共16条active互联链路；
+		F卡，支持16条上联链路(从每个设备出来都是16条链路，是M卡数量的2倍)，2个vPC对等体之间共32条active互联链路；
+		负载均衡方式由设备自身判断；
+		N5K上所有的上联端口都在1个portchannel，1个VPC中；
+		N7K下联N5K的所有端口也都在1个VPC和1个portchannel中；
+		支持最大320G上联带宽；
+
+
+
+
+8. 数据中心之间VPC设计(DCI, Data Center Interconnect)
+设计1：汇聚层和DCI的多级VPC；
+设计2：L2/L3双站点互联；
+DCI间的VPC设计用于连接2个数据中心，如果要连接多个DC，推荐使用OTV技术；
+基于802.1AE的MACsec加密技术可以加密DC之间传输的数据(需要LAN advanced service license)，只有M卡支持；
+
+
+
+DCI VPC设计1：Multilayer vPC for Aggregation and DCI
+每一个Domain要使用单独的Domain ID，在此种结构中总共4个domain id；
+在每一个DCk上，vpc domain与aggr domain之间是dobuble-sided拓扑；
+使用vpc 11和vpc 21互联2个DC；
+在用于DCI的vpc portchannel下配置BPDU filter和port type edge；
+peer link上的stp端口状态是network，这与正常的VPC是一样的；
+在aggregation domain与DCI VPC domain间的端口上配置root guard，aggregation domain是stp root；
+DCI之间是L2的，没有L3链路；
+DCI VPC上不要使用bridge assurance；
+如果2个DC间要使用802.1AE的MAC加密，需要在DCI VPC上配置M卡；
+
+
+
+DCI VPC设计1：Dual Layer2/Layer3 Pod Interconnect
+	DCI可以在aggregation之间直接互联，根据不同的需要流量走L2链路到对方DC或者走L3链路出去；
+	每个Domain使用单独的domain id；
+	在DCI VPC接口上使用bpdu filter和port type edge技术；
+	peer link上的stp端口状态是network，这与正常的VPC是一样的；
+	在DCI VPC上配置root guard，root必须在自己本地的DC；
+	DCI之间不允许使用L3链路；
+	如果2个DC间要使用802.1AE的MAC加密，需要在DCI VPC上配置M卡；
+
+
+9. STP设计
+
+vpc peer上的STP配置要保持一致以通过配置一致性检查；
+STP需要保持激活状态，但并不会控制VPC成员端口的状态；
+逻辑的接口也应该激活STP；
+
+
+STP的使用：
+正常情况下，VPC peer与接入设备之间逻辑上是点到点的，所以不存在STP环路，STP的作用是在VPC失效的时候防止环路；
+在VPC初始化时进行环路保护；
+非VPC的连接设备；
+当添加和删除VPC时，进行环路管理；
+
+
+最佳实践：
+	所有VLAN都要运行STP协议，包括运行VPC的VLAN；
+	确保二层域中的所有交换机都运行Rapid-PVST或者MST(默认IOS是non-rapid PVST+)，这样就避免了慢速STP收敛；
+	推荐在面向主机的端口上配置端口快速（port type edge）收敛；
+	保证STP的root是VPC的primary；
+	保证STP的root在汇聚层；
+	在连接接入层设备的接口配置root guard；
+	在vpc peer-link上配置bridge assurance（默认开启），且只在peer-link上启用此功能；
+	在面向主机的端口配置port type edge或者port type edge trunk(连接虚拟服务器的物理主机)来快速收敛；
+	全局或在面向主机的端口配置budu guard，全局和在面向主机的端口配置效果是一样的，因为bpdu guard只在具备type edge特性的端口生效，而这样的端口正是面向主机的端口；
+	在VPC上不要启用loopguard（默认关闭）；
+
+
+
+
+
+VPC(Virtual Port-Channel)
+VPC特性不需要单独的license支持；
+
+
+传统Port-Channel特性
+多根链路绑定成一条逻辑的单一链路；
+在2个物理设备之间；
+一个物理端口只能属于一个port-channel；
+port-channel中的所有端口必须兼容，要有相同的速率和双工模式；
+分为2层和3层的port-channel，2层和3层的接口不能在1个port-channel中；
+2层的port-channel有mode access和mode trunk两种类型；
+静态的port channel配置为channel mode on；
+动态的可以有LACP协议(active/passive 2种模式)和PAGP协议，NEXUS不支持PAGP协议；
+通过HASH来做负载均衡，可以手动配置负载均衡方式；
+
+
+
+5.在一个Port-Channel中混合使用M和F卡是不允许的，因为他们有不同的性能
+有三种spanning tree port可以在全局和接口模式下配置： Edge，Network，Normal。
+  edge     Consider the interface as edge port (enable portfast)
+  network  Consider the interface as inter-switch link
+  normal   Consider the interface as normal spanning tree port
+
+
+vPC配置
+　　在思科Nexus 5000交换机上实现配置vPC要经过以下这些步骤：
+		开启vPC特性
+		创建vPC域，进入vpc-domain模式
+		配置vPC 对端存活检测链路(vPC peer keepalive link)
+		(可选的)配置系统优先级（指的是LACP协商优先级）
+		(可选的)配置vPC角色优先级
+		创建vPC对端互联链路(vPC peer link)
+		将PortChannel配置归属于vPC 
+
+验证vPC配置
+
+		show feature 检查vPC特性是否开启
+
+		show vpc brief 显示vPCs的简要信息
+
+		show vpc consistency-parameters  显示需要在所有vPC接口上需要保持一致参数的一致性状态
+
+		show running-config vpc显示关于vPC的运行配置信息
+
+		show port channel capacity  输出配置的PortChannel数量和设备剩余可用的PortChannel数量
+
+		show vpc peer-keepalive  显示关于对端存活检测消息的信息
+
+		show vpc role 显示端设备状态，本地设备角色，vPC系统MAC地址和系统优先级，以及本地vPC设备的MAC地址和优先级。
+
+
+
+
+VPC交换机主备选择：
+
+主交换机主导在VPC中的STP；不支持抢占选举；VPC对等体对于连接到VPC的邻居设备而言，表现为一个单一交换机
+
+
+3.4 VPC与FHRP：
+
+VPC主设备也设置为HSRP的主设备。VPC环境中FHRP处于双活状态。
+
+VPC环境下FHRP备设备从下联接收流量不会把流量转给FHRP主设备转发，自己本身可以转发。
+
+3.5 VPC特性：
+
+VPC Peer Switch：对等交换
+
+一般情况下主设备引导STP的根，当主设备故障，备设备成为主设备时，又要再次为配置STP的根，为减少配置，可令主备设备都是STP根，且下发BPDU。
+
+Auto recovery：自动恢复
+
+如果两VPC交换机同时重启时，默认两VPC设备比邻关系建立起来之前，所有VPC成员端口都被挂起。
+
+如果只有一个VPC设备工作，因为协商未成功，本地VPC成员端口仍处于挂起。
+
+启用Auto recovery特性后，默认等待240秒后。本地VPC成员端口可以通信。
+
+Delay Restore：
+
+当一个VPC重启并且恢复后，路由协议需要时间来收敛，在三层连接重新建立之前，VPC将会成为访问层访问核心层的路由黑洞。
+
+配置Delay Restore特性后，当系统重新启动后，延时“n”秒激活VPC接口。
+
+VPC Object Tracking：追踪
+
+主设备的路由接口同时故障且Peer link故障，主设备会告诉备设备设备故障，备设备成为主设备转发数据。
+
+ARP Synchronization：ARP同步，基于CFS。
+
+
+
+peer-switch       Enable peer switch on vPC pair switches
+
+
+PortFast 加快终端主机连接入stp网络的收敛.只适用于,在交换机与主机(电脑)相连的端口, 不应该在交换机与交换机,路由器,hub互连的网络设备的端口使用.
+把一个port设置了portfast，就是让那个port不再使用STP的算法。
+在STP中，port有5个状态：disable、blocking、listening、learning、forwarding。
+只有forwarding状态，port才能发送用户数据。如果一个port一开始是没有接pc，一旦pc接上，就会经历blocking->listening->learing->forwarding，每个状态的变化要经历一段时间，这样总共会有3个阶段时间，缺省的配置要50秒钟。这样从pc接上网线，到能发送用户数据，需要等50秒的时间，但如果设置了portfast，那就不需要等待这50秒了。
+portfast只能用在接入层,也就是说交换机的端口是接HOST的才能起用portfast,如果是接交换机的就一定不能启用,否则会造成新的环路.
+起用portfast往往是因为一些应用的要求,cisco是建议将符合条件的port设置成portfast的.
+配置portfast端口
+switch（config)#interface range f0/1 - 5
+switch(config-if-range)#spanning-tree portfast
+
+bpduguard应用
+
+将SWITCH的端口设置为spanning-tree portfast后，如果这个端口接到其他SWITCH或者HUB上就可能造成环路问题。加上spanning-tree bpduguard enable之后，当这个端口在收到BPDU包后就会进入errdisable状态，从而避免环路。
+BPDU GUARD的功能是当这个端口收到任何的BPDU就马上设为Error-Disabled状态。
+Portfast和bpduguard配置：
+switch（config)#interface range f0/1 - 5
+switch(config-if-range)#spanning-tree portfast
+switch(config-if-range)#spanning-tree bpduguard enable
+
+BPDU Guard使具备PortFast特性的端口在接收到BPDU时进入err-disable状态来避免桥接环路，其可在全局或接口下进行配置（默认关闭），可使用errdisable recovery cause bpduguard命令开启端口状态的自动恢复。
+
+BPDU GUARD工作原理：当交换机STP功能启用的时候,默认所有端口都会参与STP,并发送和接受BPDU，当BPDU GUARD开启后,在正常情况下，一个下联的端口是不会收到任何BPDU的，因为PC和非网管换机都不支持STP,所以不会收发BPDU。当这个端口下如果有自回环的环路，那么它发出去的BPDU在非网管换机上回环后就会被自己接收到，这个时候BPDU GUARD就会把它立刻设为Error-Disabled状态,这个端口就相当于被关闭了，不会转发任何数据，也就切断了环路,保护了整个网络。BPDU Guard特性可以全局启用也可以基于基于接口的启用,两种方法稍有不同. 当在启用了Port Fast特性的端口收到了BPDU后，BPDU Guard将关闭该端口，使该端口处于err-disable状态，这时必须手动才能把此端口回复为正常状态。
+DD-2FS2C07-BIZ-HBS-01(config)# 
+DD-2FS2C07-BIZ-HBS-01(config)# errdisable recovery cause bpduguard 
+DD-2FS2C07-BIZ-HBS-01(config)# exit
+
+BPDU Filter
+
+不同于BPDU防护，BPDU Filter配置于全局/接口模式时，功能有所不同，当启用于PortFast端口模式时，交换机将不发送任何BPDU，并且把接收到的所有BPDU都丢弃；而启用于全局模式时，端口在接收到任何BPDU时，将丢弃PortFast状态和BPDU过滤特性，更改回正常的STP操作，BPDU Filter特性默认关闭。
+当同时启用bpduguard与bpdufilter时，bpdufilter优先级较高，bpduguard将失效 。
+
+BPDU Filtering特性和BPDU Guard特性非常类似.通过使用BPDU Filtering,将能够防止交换机在启用了Port Fast特性的端口上发送BPDU给主机。 如果全局配置了BPDU Filtering，当某个Port Fast端口接收到了BPDU,那么交换机将禁用Port Fast和BPDU Filtering特性,把端口更改回正常的STP状态.如果在单独的Port Fast端口启用BPDU Filtering,此端口将不发送任何的BPDU并忽略所有接收到的BPDU. 注意,如果在连接到其他交换机的端口(不是连的主机的端口)上配置了BPDUFiltering,那么就有可能导致层2环路（Prevent from sending and receiving BPDU）.另外,如果在与启用了BPDU Filtering的相同端口上配置了BPDU Guard特性,所以BPDU Guard将不起作用,起作用的将是BPDU Filtering.
+配置BPDU Filtering:
+Switch(config)# spanning-tree portfast bpdufilter default /---在启用了Port Fast特性的端口上启用BPDU Filtering---/
+Switch(config-if)# spanning-tree bpdufilter enable /---在不启用Port Fast特性的情况下启用BPDU Filtering---/
+
+ROOT Guard
+
+Root Guard：防止新加入的交换机(有更低根网桥ID)影响一个已经稳定了（已经存在根网桥）的交换网络,阻止未经授权的交换机成为根网桥。
+工作原理：当一个端口启动了此特性，当它收到了一个比根网桥优先值更优的BPDU包，则它会立即阻塞该端口，使之不能形成环路等情况。这个端口特性是动态的，当没有收到更优的包时，则此端口又会自己变成转发状态了。ROOT Guard在DP(designated port)指定端口上做，该端口就不会改变了，只会是DP了，这样可以防止新加入的交换机成为root，该端口就变成了永久的DP了, (show spanning-tree inconsistentport),若新加入的交换机想成为root，则它的端口不能工作，直到这个新交换机委曲求全做RP为止。
+
+Switch(config-if)# spanning-tree guard root
+
+
+
+不一致的生成树度量指标
+
+在过去，生成树使用16位值作为网桥使用的链路成本，以计算通向根的最短路径。若使用这些较老的16位度量指标，10Mbps链路的成本为100，1Gbps链路的成本为4。然而，这些度量指标已跟不上链路速度的需要，现在有了32位长路径成本。若使用较新的32位度量指标，1Gbps链路的成本为20000，10Gbps链路的成本为2000，而100Gbps链路的成本为200。
+
+想在思科交换机上启用长路径成本，只要输入这个全局配置命令。
+Core-Sw1(config)# spanning-tree pathcost method long
+
+如果网络里面既有使用16位路径成本值的交换机，又有使用32位路径成本值的交换机，就会出现问题。因此，配置方面做到一致很重要，力求让你的所有网络设备都使用32位长路径成本这一较新的度量指标。

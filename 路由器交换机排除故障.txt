@@ -1,0 +1,263 @@
+﻿思路：
+
+1.做配置,保证配置正确
+2.查看配置状态
+	show ip interface brief 查看接口ip状态
+	show interface brief 查看接口状态
+3.状态不正常处理方法：
+	通过ping测试是否通
+		ping 测试通，说明直连没有问题
+			是否配置动态路由协议
+				有：看协议状态是否正常
+
+		ping 测试不通，说明直连有问题
+			处理方法：
+				1.show interface eth1/1 查看当前接口状态是否存在丢包情况
+				2.show cdp neighbor  查看邻居线路是否正常 华为使用dismally lldb neighbor查看
+
+
+
+Cisco设备Show Interface命令详解
+结合Cisco路由器性能测试一书，最近想根据实际操作经验，对Show Interface命令作一个完整的详细解读
+
+R1#show interfaces fastethernet 3/0
+
+FastEthernet3/0 is up, line protocol is up
+
+  Hardware is TSWITCH, address is 00e0.f7a4.5130 (bia 00e0.f7a4.5130)
+
+  MTU 1500 bytes, BW 100000 Kbit, DLY 100 usec, rely 255/255, load 1/255
+
+  Encapsulation ARPA, loopback not set, keepalive set (10 sec)
+
+  Half-duplex, 100BaseTX
+
+  ARP type: ARPA, ARP Timeout 04:00:00
+
+  Last input 00:05:30, output 00:00:00, output hang never
+
+  Last clearing of "show interface" counters never
+
+  Queueing strategy: fifo
+
+  Output queue 0/40, 0 drops; input queue 0/75, 0 drops
+
+  5 minute input rate 0 bits/sec, 0 packets/sec
+
+  5 minute output rate 0 bits/sec, 0 packets/sec
+
+     312 packets input, 18370 bytes, 0 no buffer
+
+     Received 216 broadcasts, 0 runts, 0 giants, 0 throttles
+
+     3 input errors, 0 CRC, 0 frame, 0 overrun, 3 ignored, 0 abort
+
+     0 input packets with dribble condition detected
+
+     15490 packets output, 1555780 bytes, 0 underruns
+
+     2 output errors, 0 collisions, 2 interface resets
+
+     0 babbles, 0 late collision, 0 deferred
+
+     0 lost carrier, 0 no carrier
+
+     2 output buffer failures, 0 output buffers swapped out
+
+
+为了便于叙述，逐条命令注释如下：
+
+  FastEthernet3/0 is up  Line protocol is up
+FastEthernet3/0 is up表示表示物理接口没有问题， Line protocol is up表示数据链路层没有问题。如果主动把接口关闭显示的状态是administratively down如果路由器在活动间隔内收到5000个以上的错误，单词Disabled将出现在此字段中
+
+
+  Hardware is TSWITCH, address is 00e0.f7a4.5130 (bia 00e0.f7a4.5130)
+此接口所用硬件叫做TSWITCH，接口MAC为00e0.f7a4.5130（bia全称为burned-in address）
+
+ 
+
+  MTU 1500 bytes
+
+MTU 是该接口的最大传输单元，结合下面的 Encapsulation ARPA 来看。Cisco 在 Ethernet 下的封装默认是 EthernetII, 最大传输单元是 1518 bytes, 最小不小于 64 bytes 。
+可以用 MTU interface 命令来改变默认的 MTU, 最小的 MTU 是 64 个字节，而最大的值是 65535 字节。
+
+5.带宽
+ 
+  BW 100000 Kbit，DLY 100 usec
+ 接口带宽(BW)通常指的是接口的运行速率，用每秒千字节表示。因为以太网运行速率为 10Mbps, 所以 BW 值显示为 10 000Kb 。
+
+ Cisco设备Show <wbr><wbr>Interface命令详解
+
+
+  Reliability  255/255
+Reliability 输出衡量了该接口在最近5分钟之内的可靠性，如过该接口是以太网介质，则Reliability 代表以太网封装的CRC的正确率，255/255表示100%正确。如果这个值过低，可能物理层链路干扰太大。
+
+  Load 1/255
+
+Load衡量了该接口的流量负载（很有用！）。该实验接口的输出只显示一个load值，而在目前观察到的大多数设备上都有发送(Txload)和接收(rxload)两个方向上的参数，。
+
+ 
+
+  Encapsulation ARPA
+
+表示此接口的数据链路层封装为目前最常用的Ethernet II（最初在RFC 894中定义，具体封装格式请参见TCP/IP详解卷一第16页）
+
+
+  Loopback not set
+
+表示该接口不是loopback
+
+
+  Keepalive set (10 sec)
+
+Keepalive是一种保活机制，该机制会每隔一段时间在接口上发送类似于“Hello”的信令，以检测对端接口时候仍然有效。如本例中的"keepalive 10 sec"表示：
+
+1）每10s检测一次
+
+2）10s之内如果没有收到对方的信令则认为对方的line protocol down了
+
+Keepalive时间段可用接口命令更改，命令“no keepalive”可禁用该保活机制。
+
+ 
+
+Half-duplex, 100BaseTX
+
+表示接口工作在半双工，并遵循100BaseTX物理层规范，基带速度为100Mbit/s。关于接口双工模式更改的配置，会牵涉到speed和duplex的命令组合，我曾在真机上测试过不同组合类型，会在以后文章中详细说明。
+
+ 
+
+  ARP type: ARPA, ARP Timeout 4:00:00
+
+ARP协议类型为ARPA，ARP缓存寿命为4小时
+
+ 
+Last input 00:05:30, output 00:00:00
+
+表示接口在多少时间以前输入或输出最后一个帧，该输出可用于判断接口何时出现故障
+
+ 
+  output hang never
+cisco文档宣称此参数是接口由于上次的某个传输时间太长而重启后所经过的时间，一般会是“never”
+
+ 
+
+  Last clearing of "show interface" counters 0:56:40
+表示离上次执行“clear counters”命令之后经历了多少时间，“clear counters”命令可以把除last input/output的“show interfaces”计数器全部清零，这可以方便排错
+
+
+  Queueing strategy: fifo
+说明该接口采用默认传统的先入先出队列机制
+
+  Output queue 0/40, 0 drops; input queue 0/75, 0 drops
+该输出显示了入站队列和出站队列的排队情况，从这两个参数可看出可能发生的拥塞情况：
+	如果出站队列丢失过多，这通常是与设备相连的物理层链路负载太大有关
+	如果入站队列丢失过多，这通常和路由器的性能有关, 但这种情况不太会发生
+还要注意的是：如果这个接口启用了包交换，则入站队列的数据包都是CPU直接处理的数据包，关于包交换和包路由的区别，详见这里。
+
+5 minute input rate 0 bits/sec, 0 packets/sec
+
+  5 minute output rate 0 bits/sec, 0 packets/sec
+
+该接口5分钟内入出站（在混乱模式下)的比特流和数据包的传输速率，请注意以下几点：
+
+1）要算多个5分钟内这些数值的平均值，数据才会准确。
+
+2）该输出可用于计算数据包的平均长度。
+
+  312 packets input, 18370 bytes
+
+自系统加电以来，设备接口收到的无错误总数据包数和总字节数；注意这里的“byte”也包括3层和2层报头。
+
+  0 no buffer
+
+这里的参数意为数据包由于路由器内部缓存不够而不得不丢弃的次数，可以和throttle输出结合起来看。注意：
+
+	1）如果该错误发生次数不多，可能和暂时的广播风暴有关。
+
+	2）如果经常发生，则可能因为路由器需要增加更多的内存。
+
+在本例中，该值为0表示路由器工作正常。
+
+  Received 216 broadcasts
+接受到的广播和多播分组总数，和packets input参数结合起来可算出自加电以来广播和多播占所有数据包的比例，此例中为69%
+
+
+  0 runts
+
+在英文里意为“矮子”，此参数说明接口丢弃的数据长度比协议规定最小长度还小的数据包数量，譬如以太网规定在物理链路上所接受的最小数据长度为72字节。（注意：72这一数值为：46+18+8。46：以太网所允许最小数据包的长度；18：ARPA以太网的报头长度；8：表示前导符(7字节)+SFD（1字节））
+如果此错误过多，则问题可能出在物理层链路（譬如冲突）或设备物理接口上。
+
+0 giants
+
+在英文里意为“巨人”，此参数说明接口丢弃的数据长度比协议规定最大长度还大的数据包数量，譬如以太网规定在物理链路上流动的最大数据长度为1526字节。（同上，1526=1500+18+8）
+
+如果此错误过多，则问题可能出在物理层链路（譬如滞后冲突）或设备物理接口上。
+ 
+  0 throttles
+这个参数过多不是说路由器的通信问题，而和路由器的内存和CPU有关。意为：路由器由于性能吃紧的原因，向接口数据流“关闭大门”而被丢弃的数据包数。可以和no buffer结合起来看。 
+
+  3 input errors
+这里显示了所有入站数据包发生错误的总和；由于一个数据包可能会遇到多个错误，所以该值不一定等于分类统计值的总和。
+
+  0 CRC
+该参数表示由于遇到CRC重算后不匹配的情况，而被丢弃的数据包数。这通常由于物理层的干扰所致。
+
+  0 frame
+
+该参数表示因为遇到了CRC错误，而被丢弃的数据包数。这通常由于物理层的干扰所致。
+
+  0 overrun
+该参数表示接受设备由于对端传得太快，而无法接受数据量的次数。我想这可能是由于物理层接口设备的缓存不足或设备故障所致。
+
+  3 ignored
+该参数表示由于接口缓存不足而丢弃数据包的个数。可以后overrun结合起来看。广播风暴和物理层线路干扰可能导致这个计数器增加。
+
+  0 abort
+该参数表示该接口接受到一半但突然中断的数据包个数。
+
+
+  0 input packets with dribble condition detected
+该参数表示数据包稍微有点长，但还是被设备接受的个数。
+
+  15490 packets output, 1555780 bytes
+自系统加电以来，设备接口发出的无错误总数据包数和总字节数；注意这里的“byte”也包括3层和2层报头。
+
+   0 underruns
+该参数表示路由器的传输器运行太快以至于路由器本身无法跟上的次数。
+
+   2 output errors
+这里显示了所有出站数据包发生错误的总和；由于一个数据包可能会遇到多个错误，所以该值不一定等于分类统计值的总和。
+
+   0 collisions
+该参数表示由于遭遇以太网冲突而重传的数据包个数。这通常因为物理层链路太忙了，譬如遇到广播风暴了。
+
+   2 interface resets
+该参数表示接口完全重启的次数。导致的原因可能是：出站的数据包不发出去长达数秒之久，物理层设备问题，重启等等。
+
+
+   0 babbles
+该参数表示传输计数器超时的次数。
+ 
+
+   0 late collision
+该参数表示在接口在传了前导符之后而又发生冲突的次数。这通常由于物理层链路过长，检测冲突的时间也滞后了。
+
+   0 deferred
+
+该参数表示路由器由于某种原因延迟传输数据桢的次数。
+
+ 
+
+   0 lost carrier
+一般和物理层链路故障有关。
+
+   0 no carrier
+一般和物理层链路故障有关。
+ 
+
+   2 output buffer failures，0 output buffers swapped out
+该参数表示由于“发送缓存”已满的原因，而丢弃数据包的次数。这可能由于数据包发得太快，或物理层链路速度有问题。
+
+ 
+
+结论：通过show interface，我们不仅可以了解接口的硬件和配置信息，通常在路由器发生软件内部错误，物理层故障或和缓存相关问题的情况下，show interface可以的一些参数非常有助于排错。Show interface还可用于监控接口进出的负载情况，帮助我们管理网络流量等等作用。

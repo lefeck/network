@@ -1,0 +1,4 @@
+static ( real_interface,mapped_interface ) { mapped_ip | interface} real_ip [netmask mask ][dns] [norandomseq] [[tcp] tcp_max_conns [ emb_limit ]] [udp udp_max_conns ]
+Example: 
+hostname(config)# static (inside,outside) 209.165.201.12 10.1.1.3 netmask 255.255.255.252
+hostname(config)# static (inside,outside) 209.165.202.129 access-list NET1

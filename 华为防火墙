@@ -1,0 +1,137 @@
+缺省的管理员admin/Admin@123支持Telnet、Console和Web的登录方式。如果使用此管理员登录设备，无需执行此步骤。首次登录时需要根据提示修改密码并妥善保管
+
+配置ssh
+
+在GigabitEthernet 1/0/3接口上启用SSH服务。
+<NGFW> system-view
+[NGFW] interface GigabitEthernet 1/0/3
+[NGFW-GigabitEthernet1/0/3] service-manage enable
+[NGFW-GigabitEthernet1/0/3] service-manage ssh permit
+[NGFW] quit
+
+配置验证方式为AAA。
+[NGFW] user-interface maximum-vty 11
+[NGFW] user-interface vty 0 4
+[NGFW-ui-vty0-4] authentication-mode aaa
+[NGFW-ui-vty0-4] user privilege level 3
+[NGFW-ui-vty0-4] quit
+
+创建SSH管理员帐号sshadmin，指定认证方式为Password，服务方式为Stelnet。
+[NGFW] aaa
+[NGFW-aaa] manager-user sshadmin
+[NGFW-aaa-manager-user-sshadmin] service-type ssh
+[NGFW-aaa-manager-user-sshadmin] access-limit 11
+[NGFW-aaa-manager-user-sshadmin] level 3
+[NGFW-aaa-manager-user-sshadmin] ssh authentication-type password
+[NGFW-aaa-manager-user-sshadmin] password
+Enter Password: 
+Confirm Password:   
+[NGFW-aaa-manager-user-sshadmin] ssh service-type stelnet
+[NGFW-aaa-manager-user-sshadmin] quit
+[NGFW-aaa] quit
+ 说明：
+对于Password认证方式的SSH管理员：如果采用本地认证方式，则SSH管理员的级别由本地配置的管理员级别决定（通过命令bind manager-user manager-name role role-name为管理员账号绑定角色或者通过命令level level配置管理员账号的权限级别）；如果采用服务器认证方式，则SSH管理员的级别由服务器返回的授权级别决定，当服务器未返回管理员的授权级别时，则SSH管理员的级别由VTY界面级别决定（通过命令user privilege level level配置管理员界面的级别）。
+
+为保证管理员能正常登录设备，建议管理员级别不小于3级。
+
+生成本地密钥对。
+[NGFW] rsa local-key-pair create
+The key name will be: NGFW_Host
+The range of public key size is (512 ~ 2048).
+NOTES: A key shorter than 1024 bits may cause security risks.                  
+       The generation of a key longer than 512 bits may take several minutes. 
+Input the bits in the modulus[default = 2048]:
+Generating keys...
+...++++++++  
+..++++++++
+..................................+++++++++  
+............+++++++++ 
+
+启用STelnet服务。
+[NGFW] stelnet server enable
+
+可选：配置SSH服务器参数。
+# 配置SSH服务器服务端口号1025，认证超时时间为80秒，认证重试次数为4次，密钥对更新时间为1小时，并启用兼容低版本功能。
+[NGFW] ssh server port 1025
+[NGFW] ssh server timeout 80
+[NGFW] ssh server authentication-retries 4
+[NGFW] ssh server rekey-interval 1
+[NGFW] ssh server compatible-ssh1x enable
+
+
+配置策略：
+
+配置各个接口IP地址并将其加入对应的安全区域。
+<NGFW> system-view
+[NGFW] interface GigabitEthernet 1/0/1
+[NGFW-GigabitEthernet1/0/1] ip address 1.1.1.1 255.255.255.0
+[NGFW-GigabitEthernet1/0/1] quit
+[NGFW] interface GigabitEthernet 1/0/3
+[NGFW-GigabitEthernet1/0/3] ip address 10.3.0.1 255.255.255.0
+[NGFW-GigabitEthernet1/0/3] quit
+[NGFW] firewall zone untrust
+[NGFW-zone-untrust] add interface GigabitEthernet 1/0/1
+[NGFW-zone-untrust] quit
+[NGFW] firewall zone trust
+[NGFW-zone-trust] add interface GigabitEthernet 1/0/3
+[NGFW-zone-trust] quit
+
+配置安全策略，允许内部网络中的PC访问Internet。
+[NGFW] security-policy
+[NGFW-security-policy] rule name policy_sec_1
+[NGFW-security-policy-sec_policy_1] source-address 10.3.0.0 mask 255.255.255.0
+[NGFW-security-policy-sec_policy_1] source-zone trust
+[NGFW-security-policy-sec_policy_1] destination-zone untrust
+[NGFW-security-policy-sec_policy_1] action permit
+[NGFW-security-policy-sec_policy_1] quit
+[NGFW-security-policy] quit
+配置NAT策略，使内网PC通过转换后的公网IP地址访问Internet。
+[NGFW] nat-policy
+[NGFW-policy-nat] rule name policy_nat_1
+[NGFW-policy-nat-rule-policy_nat_1] source-address 10.3.0.0 mask 255.255.255.0
+[NGFW-policy-nat-rule-policy_nat_1] source-zone trust
+[NGFW-policy-nat-rule-policy_nat_1] egress-interface GigabitEthernet 1/0/1
+[NGFW-policy-nat-rule-policy_nat_1] action nat easy-ip
+[NGFW-policy-nat-rule-policy_nat_1] quit
+[NGFW-policy-nat] quit
+配置缺省路由，指定下一跳地址为1.1.1.254。
+[NGFW] ip route-static 0.0.0.0 0.0.0.0 GigabitEthernet 1/0/1 1.1.1.254
+
+
+
+
+记录日志
+
+Syslog日志：记录设备的运行信息，操作信息及威胁日志等信息，可以判断设备安全情况。
+
+查看信息中心是否使能，使能后才能记录日志信息，默认是使能的。
+[sysname] display info-center
+Information Center:enabled
+开启信息中心。
+[sysname] info-center enable
+配置日志服务器IP地址和发送日志信息的源接口。
+[sysname] info-center loghost x.x.x.x
+[sysname] info-center loghost source GigabitEthernet 1/0/1
+
+
+检查系统时间
+
+1.检查系统时间。时间应与当地实际时间一致，如果不一致，请修改系统时间。
+<sysname> display clock
+
+2.设置所在的时区。
+<sysname> clock timezone time-zone-name { add | minus } offset
+add表示time-zone-name时区的时间比通用协调时间UTC时间要早。例如，设置时区为北京所在的东八区（+8），使用add 08:00:00。
+minus表示time-zone-name时区的时间比通用协调时间UTC时间要晚。例如，设置时区为美国所在的西八区（-8），使用minus 08:00:00。
+
+修改时区。
+<sysname> clock timezone BeiJing add 08:00:00
+
+
+
+
+关闭不使用的服务
+
+display tcp status，查看设备处于侦听状态的端口，即可知设备已开启的服务，若不需要使用，则关闭。
+
+undo ftp server enable 执行命令关闭服务，以FTP服务为例。

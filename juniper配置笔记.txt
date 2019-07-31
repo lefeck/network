@@ -1,0 +1,252 @@
+1.2. Junos 基础管理操作配置 
+1.2.1. CLI 命令行的使用介绍 
+可通过 console/telnet/ssh 的方式进行命令行 CLI 模式管理设备。默认情况下任何有权限的账号都可通过 console 登录管理设备，而 Telnet 和 SSH 需要非 ROOT 的账户才可以登录管理设备，但是root账户可以通过命令开通允许 SSH 管理。 
+通过命令行登录设备后可能会碰 2 种情况： 
+第 1 种情况：提示符显示为%，这种情况通常是使用 root 账户登录进入了 shell 模式，shell模式无法管理 SRX 设备，需要通过命令 cli，才能进入到操作模式即提示符>。 
+例： 
+root@srx210% cli 
+root@srx210>  
+第 2 种情况：提示符直接显示为>即操作模式，操作模式下可以对设备的配置及各个组件运行状态进行查看和信息的收集以及重新启动或关闭设备，但不能变更设备的配置；通过 config 命令进入到配置模式即#模式，在该模式下可以对配置进行变更。 
+例： 
+root@srx210> configure
+root@srx210# 
+命令可以简写，可以通过按空格键自动补全，
+1.3. Junos 配置模式特性 
+  （1）JUNOS 通过 set 语句进行配置，配置输入后并不会立即生效，而是作为候选配置（Candidate Config）等待管理员提交确认，管理员通过输入 commit 命令来提交配置，配置内容在通过 SRX 语法检查后才会生效，一旦 commit 通过后当前配置即成为有效配置（Active config）。另外，
+  （2）JUNOS 允许执行 commit 命令时要求管理员对提交的配置进行两次确认，如执行 commit confirmed 2 命令要求管理员必须在输入此命令后 2 分钟内再次输入 commit 以确认提交，否则 2分钟后配置将自动回退，这样可以避免远程配置变更时管理员失去对 SRX 的远程连接风险。 
+  （3）在执行 commit 后配置模式下可通过 run show config 命令查看当前有效配置（Active config）。
+  （4）通过执行 show | compare 比对候选配置和有效配置的差异。并可通过执行 rolback 和 commit 命令返回到以前配置（如 rollback 0/commit 可返回到前1个 commit 配置）；
+  （5）可以通过执行 save configname.conf 手动保存当前配置，并执行 load override configname.conf / commit 调用前期手动保存的配置。执行 load factory-default / commit 命令可恢复到出厂缺省配置。 
+  (6)SRX 通过 delete 语句来删除配置，如： delete security nat 
+  (7)Edit 命令用于进入相应的层级，比如对 NAT 进行配置可以使用：edit security nat 命令进入 NAT 配置层级，然后使用 set 命令对当前层级下的内容进行配置，用exit退出到root。
+  例：
+ root# edit security nat  
+ [edit security nat]
+ root# exit 
+ [edit]
+ root#
+  (8)  SRX 可以通过 copy 命令，快速的复制命令，比如可以快速的将一个接口的配置复制到
+另一个接口，使 2 个接口下的配置一样，在更换接口时非常方便。 
+例：
+root# copy interfaces ge-0/0/1 to ge-0/0/2 
+  (8) SRX 可以通过 copy 命令，快速的复制命令，比如可以快速的将一个接口的配置复制到SRX 可对模块化配置进行功能关闭与激活，如执行 deactivate security nat 命令可使NAT 相关配置失效，并可通过执行 activate security nat NAT 配置再次生效。 
+  (9) Rollback 命令，可以回滚配置到前面保存的状态，其中 0 号配置是当前活动配置 
+
+
+1.3.1. 设置 root 用户口令 
+登录设备后必须设置 ROOT 用户的密码，否则无法提交配置使其生效。 
+在 CLI 命令行中的操作 
+设置root用户口令 
+root# set system root-authentication plain-text-password 
+root# new password : root123 
+root# retype new password: root123 密码将以密文方式显示，确认后，用下面命令查看时，密码字符会以密文方式显示。 
+root# show system root-authentication 
+encrypted-password "$1$xavDeUe6$fNM6olGU.8.M7B62u05D6."; # SECRET-DATA 
+
+1.3.2. 设置远程登录管理用户 
+远程管理设备通常使用：HTTP/HTTPS/TELNET/SSH 几中协议，其中 ROOT 账户可以使用 HTTP/HTTPS/SSH；TELNET 必须要新建一个 Super-User 级别的账户才可以。 
+在 CLI 管理方式中的相关配置 
+root# set system login user lab class super-user authentication plain-text-password 
+root# new password : lab123 
+root# retype new password: lab123 
+增加一个超级管理员账户 lab，密码为 lab123
+
+1.3.3. 	允许远程管理设备配置 
+在 CLI 管理方式中的相关配置 
+set system services telnet 
+set system services web-management http   /***在系统级开启telnet/http 远程接入管理服务***/ 
+set system services web-management http interface ge-0/0/0.0    /***把允许通过WEB管理的接口加入到http interface中，本例中加入了ge-0/0/0.0即允许通过外网的接口从WEB管理设备***/ 
+set interfaces ge-0/0/0 unit 0 family inet address 192.168.1.238/24 
+set routing-options static route 0.0.0.0/0 next-hop 192.168.1.2 
+/***配置逻辑接口地址及缺省路由，SRX 接口要求IP 地址必须配置在逻辑接口下（类似ScreenOS 的子接口），通常使用逻辑接口0 即可***/ 
+set security zones security-zone untrust interfaces ge-0/0/0.0 
+/***将ge-0/0/0.0 接口放到安全区域中，类似ScreenOS***/ 
+set security zones security-zone untrust host-inbound-traffic system-services ping 
+set security zones security-zone untrust host-inbound-traffic system-services http 
+set security zones security-zone untrust host-inbound-traffic system-services telnet 
+set security zones security-zone untrust host-inbound-traffic system-services ssh 
+/***在untrust zone 打开允许远程登陆管理服务，ScreenOS 要求基于接口开放服务，SRX 要求基于Zone 开放，此处允许外网通过Ping/http/telnet/ssh访问其zone中的接口 ***/ 
+
+show interfaces terse  查看接口简明信息
+show interfaces |display set
+
+1.3.4. 设备恢复出厂介绍 
+恢复出厂值通常可通过 2 种方式，即执行恢复出厂值命令和使用针状物长压硬件面板
+上的 reset 孔。 
+1.在 CLI 管理方式中的相关配置 
+在配置模式执行下面命令： 
+root# load factory-default 
+如果恢复成功，需要重新设置 root 密码，并提交配置文件后需要重新启动设备。否则设备可能会工作不正常。 
+2.通过 Reset 孔重置设备 
+在面板上有一个标识为 reset 的小孔，使用曲别针粗细的针状物，顶到底等待约至少 15 秒，看到 Status 状态灯，又绿转为桔色后放开，再待 Status 灯又桔转为绿色，说明重置完成。如果不成功可将设备重启或重启后再试。 
+
+
+2.1. 设备关机 
+关于关机，有两种情况，一种关机可以彻底切断电源，另一种关机只是关闭 JUNOS 软件，设备不切断电源，不同的设备会有不同的情况。 
+在 CLI 管理方式中的相关配置支持关机的命令： 
+1.	切断电源，命令成功后，设备处于断电状态。 
+命令：user@host> request system power-off 
+2.	关闭JUNOS 系统，可以通过Console 中按任意键后启动设备。 
+命令：user@host> request system halt 
+… 
+The operating system has halted. Please press any key to reboot 
+
+
+3.4. 策略相关配置 
+策略是对安全区段之间而言的，是有方向性的。策略的组成元素有地址、地址集、服务、服务集和时间。  
+3.4.1. 策略地址及地址集对象定义 
+本例中做如下定义： 
+在 untrust 区段中定义地址集：DNSGROUP 地址名称为：DNS10，对应地址为：192.168.1.10/32；并将 DNS10 放入 DNSGROUP 在 trust 区段定义地址名称为 Lan，对应地址为 172.17.1.0/24 
+在 CLI 管理方式中的相关配置 
+set security zones security-zone untrust address-book address DNS10 192.168.1.10/32 
+set security zones security-zone untrust address-book address-set DNSGROUP address DNS10 
+set security zones security-zone trust address-book address Lan 172.17.1.0/24 
+
+
+3.4.2. 策略服务对象定义 
+设备中已经预定义了大多数常用的服务，可以直接引用到策略中，但是有些不常用的服务端口就需要自己定义。本例中定义一个 TCP-8080 端口在 CLI 管理方式中的相关配置 
+set applications application tcp-8080 protocol tcp
+set applications application tcp-8080 source-port 8770
+set applications application tcp-8080 destination-port 80
+
+
+3.4.3. 策略时间调度对象定义 
+时间计划可以让策略在特定的时间生效。 
+本例中定义一个时间计划名称为：AllowDNS，时间范围为每天中午 12：00-13：00。在 CLI 管理方式中的相关配置 
+set schedulers scheduler AllowDNS daily start-time 12:00:00 stop-time 13:00:00
+
+
+3.4.4. 策略配置举例 
+在完成接口、路由和 zone 的基本配置外，zone之间要相互通信，必须通过策略明确允许后才可以通讯，否则默认动作就是拒绝（可以通过命令将默认动作更改为允许）。本例中创建一条策略允许从 Trust 的地址 Lan 到 Untrust 的地址集 DNSGROUP 的自定义服务 TCP-8080 的访问，并受调试时间 AllowDNS 的限制。 
+在 CLI 管理方式中的相关配置 
+set security policies from-zone trust to-zone untrust policy AllowDNS match source-address Lan 
+set security policies from-zone trust to-zone untrust policy AllowDNS match destination-address DNSGROUP 
+set security policies from-zone trust to-zone untrust policy AllowDNS match application tcp-8080 
+set security policies from-zone trust to-zone untrust policy AllowDNS then permit 
+set security policies from-zone trust to-zone untrust policy AllowDNS scheduler-name AllowDNS 
+
+HA配置
+
+对于新设备而言，拆箱上架，开机，先将控制心跳线必须连接，无需做任何配置，否则，主备设备无法识别在同一个cluster-id中之后将主备设备加入同一个cluster-id中重启设备，做成HA，此后所有的操作都在主设备上配置。在操作模式下可以对配置进行变更。
+>set chassis cluster cluster-id 1 node 0 reboot    主设备配置
+>set chassis cluster cluster-id 1 node 1 reboot    备设备配置
+
+设置主机名
+set groups node0 system host-name DCB_NIB232_INT_FW01
+set groups node1 system host-name DCB_NIB233_INT_FW02
+
+配置管理接口fxp0的ip
+set groups node0 interfaces fxp0 unit 0 family inet address 10.188.255.31/24
+set groups node1 interfaces fxp0 unit 0 family inet address 10.188.255.32/24
+set apply-groups "${node}"
+ 
+配置数据接口fab0、fab1划入物理接口 
+set interfaces fab0 fabric-options member-interfaces ge-0/0/3
+set interfaces fab1 fabric-options member-interfaces ge-0/0/3
+
+配置reth接口将物理接口划分到reth
+set chassis cluster reth-count 10
+set interfaces ge-0/0/0 gigether-options redundant-parent reth0
+set interfaces ge-0/0/1 gigether-options redundant-parent reth1
+set interfaces ge-4/0/0 gigether-options redundant-parent reth0
+set interfaces ge-4/0/1 gigether-options redundant-parent reth1
+
+配置reth接口ip
+set interfaces reth0 unit 0 family inet address 172.254.247.4/28
+set interfaces reth1 unit 0 family inet address 172.254.248.1/28
+
+配置reth#划入到zone
+set security zones security-zone trust interfaces reth0.0 
+set security zones security-zone untrust interfaces reth1.0
+配置reth#到group
+set interfaces reth0 redundant-ether-options redundancy-group 1
+set interfaces reth1 redundant-ether-options redundancy-group 1
+配置node #优先级
+set chassis cluster control-link-recovery  #当其中一个心跳线坏了，备会disable，自动进行reboot
+set chassis cluster heartbeat-interval 1000  #ms
+set chassis cluster heartbeat-threshold 3  #次
+set chassis cluster redundancy-group 0 node 0 priority 200
+set chassis cluster redundancy-group 0 node 1 priority 100
+set chassis cluster redundancy-group 1 node 0 priority 200
+set chassis cluster redundancy-group 1 node 1 priority 100
+set chassis cluster redundancy-group 1 preempt 设置抢占
+配置group的监控端口
+set chassis cluster redundancy-group 1 interface-monitor ge-0/0/0 weight 255
+set chassis cluster redundancy-group 1 interface-monitor ge-4/0/0 weight 255
+set chassis cluster redundancy-group 1 interface-monitor ge-0/0/1 weight 255
+set chassis cluster redundancy-group 1 interface-monitor ge-4/0/1 weight 255
+
+状态查看
+
+show version 
+show system alarm
+show chassis alarm
+show chassis hardware
+show chassis routing-engine
+show chassis fpc detail
+show chassis fpc pic-status
+show chassis environmentredun
+show chassis cluster status (redeundancy-group 1)
+show chassis cluster information
+show chassis cluster statistics
+show chassis cluster interfaces 
+show interfaces terse | match reth
+show interfaces terse | match “fab|fxp1”
+
+  地址转换NAT
+
+  基于源ip的NAT
+
+set security nat source rule-set trust-to-untrust from zone trust 
+set security nat source rule-set trust-to-untrust to zone untrust 
+set security nat source rule-set trust-to-untrust rule source-nat-rule match source-address 0.0.0.0/0 
+set security nat source rule-set trust-to-untrust rule source-nat-rule then source-nat interface          
+
+ Pool based Source Nat 基于地址池的源地址转换
+
+set security nat source pool snatpool address 202.100.12.23/32 to 202.100.12.30/32       #映射后的地址池
+set security nat source rule-set trust-to-untrust from zone trust
+set security nat source rule-set trust-to-untrust to zone untrust
+set security nat source rule-set trust-to-untrust rule 1 match source-address 192.168.0.0/22
+set security nat source rule-set trust-to-untrust rule 1 then source-nat pool snatpool
+set security nat proxy-arp interface ge-0/0/1.0 address 202.100.12.23/32 to 202.100.12.30/32    #只要是pool的，必须用proxy-arp
+
+  基于目的地址池Pool-based & no port translation
+
+set security nat destination pool a address 192.168.12.1/32 to 192.168.12.4/32  
+set security nat destination rule-set 1 from zone untrust
+set security nat destination rule-set 1 to zone trust
+set security nat destination rule-set 1 rule 1a match destination-address 100.0.0.1/32
+set security nat destination rule-set 1 rule 1a then destination-nat pool a
+
+ Pool based Destination Nat 基于地址池的目标地址转换
+
+set security nat destination pool srv11-3389 address 172.16.1.11/32  #映射前的目的ip
+set security nat destination pool srv11-3389 address port 3389 
+set security nat destination rule-set utot from zone untrust 
+set security nat destination rule-set utot to zone trust 
+set security nat destination rule-set utot rule u236-srv11-3389 match sourceaddress 0.0.0.0/0 
+set security nat destination rule-set utot rule u236-srv11-3389 match destinationaddress 192.168.1.236/32  #映射后的目的ip
+set security nat destination rule-set utot rule u236-srv11-3389 match destinationport 3389 
+set security nat destination rule-set utot rule u236-srv11-3389 then destinationnat pool srv11-3389 
+
+  Pool based Static Nat 基于地址池的静态地址转换（目的NAT转换，）
+
+set security nat static rule-set SUTOT from zone untrust 
+set security nat static rule-set SUTOT to zone trust  
+set security nat static rule-set SUTOT rule U237-SRV10 match destination-address 192.168.1.237/32    #转换后的目的ip
+set security nat static rule-set SUTOT rule U237-SRV10 then static-nat prefix 172.16.1.10/32  #转换前的目的ip
+set security nat proxy-arp interface ge-0/0/0.0 address 192.168.1.237/32 
+
+注意：大多数情况下，基于源做NAT目的是任意的，基于目的做NAT 源是任意的，因此任意的参数可配可不配，如果是主机地址
+
+   NAT状态检查
+
+run show security flow session   destination-prefix 59.46.168.212 destination-port 80 
+run show security zones          untrust
+run show security policy         from-zone untrust to-zone trust  
+run show security nat static rule all
+run show security nat destination rule all 
+run show security nat source rule all
+run show security nat source pool all
+run show security nat destination pool all

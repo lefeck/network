@@ -1,0 +1,303 @@
+
+搭建 Console 口配置环境
+
+给设备上电。设备会进行自检，并且自动进行系统初始化配置。如果系统启动成功，会出现登录提示“login：”。在登录提示后输入默认管理员名称“hillstone”并敲回车键，界面出现密码提示“password”，输入默认密码“hillstone”并敲回车键，此时用户便成功登录并且进入 CLI 配置界面。
+
+搭建 WebUI 配置环境
+        1. 将管理 PC 的 IP 地址设置为与 192.168.1.1/24 同网段的 IP 地址，并且用网线将管理 PC与设备的 ethernet0/0 接口进行连接。
+		2. 在管理 PC 的 Web 浏览器中输入地址 http://192.168.1.1 并按回车键。出现登录页面如
+		3. 输入用户名和密码。设备提供的默认用户名和密码均为“hillstone”。
+		4. 点击『登录』按钮进入设备的主页
+
+接口配置
+
+
+LACP 动态协商聚合
+
+         LACP 动态协商聚合通过在链路两端均开启 LACP 协议来动态协商聚合链路。Hillstone 设备通过在集聚接口上启用 LACP 链路聚合功能。
+         聚合组成员接口状态
+                 Unselected：表示接口没能被聚合组选中，不可参与流量转发。
+                 Selected：表示接口被聚合组选中，但是相连的对端没有准备好，不可参与流量转发。
+                 Standby：表示接口目前处于备份状态，不可参与流量转发。
+                 Active：表示接口聚合成功，处于活跃状态，可参与流量转发。
+
+         配置 LACP 动态协商聚合
+				LACP 动态协商聚合的配置包括以下各项：
+				启用/禁用 LACP 协议
+				    启用：lacp enable
+                    禁用：no lacp enable
+				lacp system-priority value    指定 LACP 系统优先级
+				lacp port-priority value       指定接口 LACP 优先级
+			    lacp period-short             指定 LACP 超时时间
+				lacp max-bundle number        指定最大活动链路数
+				lacp min-bundle number        指定最小活动链路数
+				load-balance mode {flow | tuple [dest-ip dest-mac dest-port protocol src-ip
+src-mac src-port]} 指定报文发送均衡方式
+
+              show lacp aggregate-name
+              示例：
+				interface ethernet0/4
+				  aggregate aggregate1
+				exit      
+				interface ethernet0/5
+				  aggregate aggregate1
+				exit
+				interface aggregate1
+				  zone  "trust"
+				  ip address 192.168.1.1 255.255.255.0
+				exit
+
+配置 DHCP 服务器功能
+		dhcp-server pool [pool-name]
+		DHCP 地址池的基本配置：指定IP 地址池范围、保留地址池配置、网关配置、网络掩码配置以及DHCP 租约配置。
+		   address [start-ip-address end-ip-address]
+		   exclude address [start-ip-address end-ip-address]
+		   gateway [ip-address]
+		   netmask [netmask]
+		   lease [lease-time]
+配置地址簿
+	    # address [address-entry]  
+	           # ip {ip-address {netmask | wildcardmask}| ip/netmask}
+	           # range [min-ip max-ip] 
+	           # member [address-entry]
+
+	           show reference address [address-entry]  查看地址条目关联项
+
+HA高可用性
+
+	HA连接配置
+
+	主设备与备份设备之间的同步信息以及 Hello 报文等都通过 HA 连接进行传输。HA连接有两种类型，分别是控制连接（Control Link）和数据连接（Data Link）。
+		控制连接：同步两台设备间的所有数据；
+		数据连接：仅同步数据报文信息，如会话信息。用户可根据需求选择是否配置数据连接。 若配置数据连接，设备间的Hello报文等将通过控制连接完成，数据同步等信息将通过数据连接完 成。若不配置数据连接，设备间所有的同步信息将通过控制连接完成。 
+	配置HA连接： 
+		ha link interface interface-name    指定HA连接接口
+		ha link data interface interface-name 指定HA数据连接接口
+	    ha link ip ip-address netmask     指定HA连接接口IP地址
+
+
+	配置监测对象 
+
+	Hillstone 设备的监测功能能够监测指定的目标（IP地址或者主机）是否可达或者接口的链路 是否连通，以及监测目标或接口链路是否出现拥塞。监测功能主要用在 HA、策略路由、链路负载均衡等场景， 用户可以通过配置监控功能确保系统始终选择相对健康的链路,切换故障。 
+
+	track track-object-name   接口链路状态监测 
+		interface interface-name [weight value]
+
+
+	HA组 
+
+	系统会对HA簇中相同HA组ID的设备，按照HCMP 协议，根据设备的HA配置，进行主备 选举。主设备处于活动状态处理网络流量，而当主设备出现故障时，其它设备代替主设备继续工作。 当为安全设备设置簇ID时，组 ID为0的HA组会自动创建。在Active-Passive（A/P）模式中， 设备仅具有 HA 组 0。在 Active-Active（A/A）模式中，目前的版本支持用户创建 2 个 HA 组， 组0和组1
+	ha group group-id
+	    priority number指定优先级范围是1到254的整数，默认值是100，优先级高（数字小）的会被选举为主设备
+	    hello interval time-interval
+	    preempt [delay-time]  配置抢占模式
+	    monitor track track-object-name  指定监测对象
+
+	HA簇配置 
+
+	HA簇是实现HA功能的设备的组合。对于外部网络设备而言，一个HA簇是一个单一的设备， 处理网络流量和提供安全服务。HA 簇通过簇 ID 进行标识。为设备指定 HA 簇 ID 后，设备进入 HA状态，执行HA功能。在全局配置模式下使用以下命令： 
+		ha cluster cluster-id
+    查看命令：
+    	show ha group-id
+    	show ha link status 
+    	show ha cluster
+
+    	在主上做完配置之后，通过如下命令来查看配置是否同步至备机
+		show ha sync state config #查看ha状态是否同步
+    	
+    	exec ha master switch-over #手动切换山石防火墙主备命令
+    
+		exec ha sync config #手动执行配置同步操作
+		
+网络地址转换（NAT）
+        snat 通常用于主机上外网使用，dnat通常用于服务对外提供服务使用。
+
+		ip vrouter [vrouter-name]
+
+		snatrule [id id] [before id | after id | top] from src-address to dst-address
+				[service service-name] [eif egress-interface | evr vrouter-name] trans-to
+				{addressbook trans-to-address | eif-ip} mode {static | dynamicip | 
+				dynamicport [sticky]} [log] [group group-id] [ track track-name]
+				[description description]
+                例：
+				# snatrule from any to any eif ethernet0/0 trans-to eif-ip mode dynamicport
+		dnatrule [id id] [before id | after id | top] from src-address to dst-address
+				[service service-name] trans-to trans-to-address [port port] [load-balance]
+				[track-tcp port] [track-ping] [log] [group group-id] [description description]
+               例子：
+                # address addr2 
+                # range 202.1.1.3 202.1.1.5 
+                # ip vrouter trust-vr 
+				# snatrule id 1 from  10.1.1.1/24 to any trans-to address-book addr2 mode dynamicport sticky 
+				# dnatrule id 2 from any to 202.1.1.6/32 service ftp trans-to  10.1.2.2/32  port 21 
+				# dnatrule id 3 from any to 202.1.1.6/32 service http trans-to 10.1.2.3/32 port 80 
+
+				src-address  源地址
+				dst-address   目的地址
+				trans-to-address 转换后的地址
+				snat 源地址可以是host，也可以是一个网段，也可以是any，主要针对PC 访问外网，服务是没有固定的端口
+				dnat 源地址一般是any，主要是针对服务对外提供服务使用。服务有固定的端口 
+
+        nat type full-cone        启用 Full-cone NAT 功能
+		nat protocol {tcp | udp}  开启 Full-cone NAT 功能的协议  
+		dnatrule move id {before id | after id| top | bottom}  修改 DNAT规则排列顺序（snatrule规则排列顺序类似）
+
+    查看配置信息
+		show dnat rule [id] [vrouter vrouter-name] 
+		show load-balance rule [id] 
+		show load-balance server [ip-address] [vrouter vrouter-name] 
+		show dnat server [ip-address] [vrouter vrouter-name] [tcp-port port] [ping] 
+		show nat {config | generic | entry | control} 查看Full-cone NAT 配置信息
+
+
+	配置策略规则
+     进入策略配置模式
+        policy-global
+     创建策略规则
+        rule [id id] [top | before id | after id] [role {UNKNOWN | role-name} | user
+				aaa-server-name user-name | user-group aaa-server-name user-group-name]
+				from src-addr to dst-addr service service-name application app-name {permit
+				| deny | tunnel tunnel-name | fromtunnel tunnel-name | webauth} 
+		例：
+		(config-policy)# rule from any to any service icmp permit 
+		编辑策略规则
+		        rule [id id] [top | before id | after id]
+				rule id id（该命令适用于规则 ID 已存在的情况，并且用该命令 no 的形式，可以删除
+				指定的策略规则，即 no rule id id）
+				进入策略规则配置模式后，可使用的编辑策略规则的命令如下：
+				命名/重新命名策略规则：name policy-name
+				指定/修改源安全域：src-zone src-zone
+
+				¨ 指定/修改目的安全域：dst-zone dst-zone
+
+				¨ 添加地址簿条目类型源地址：src-addr src-addr
+
+				¨ 添加 IP 成员类型源地址：src-ip ip/netmask
+
+				¨ 添加主机成员类型源地址：src-host host-name
+
+				¨ 添加 IP 地址范围类型源地址：src-range min-ip [max-ip]
+
+				¨ 添加地址簿条目类型目的地址：dst-addr dst-addr
+
+				¨ 添加 IP 成员类型目的地址：dst-ip {ip/netmask | ip-address netmask}
+
+				¨ 添加主机成员类型目的地址：dst-host host-name
+
+				¨ 添加 IP 地址范围类型目的地址：dst-range min-ip [max-ip]
+
+				¨ 添加服务类型：service service-name
+
+				¨ 添加应用类型：application application-name
+
+				¨ 指定角色：role {UNKNOWN | role-name}
+
+				¨ 指定用户：user aaa-server-name user-name
+
+				¨ 指定用户组：user-group aaa-server-name user-group-name
+
+				¨ 修改处理行为：action {permit | deny | tunnel | fromtunnel | webauth}
+				¨ 配置时间表：schedule schedule-name
+
+
+		Service 配置长连接:
+			示例：
+				# service tcp-wechat
+					# tcp dst-port 3389 src-port 2345 [timeout] | [timeout-day]  1
+					timeout 1-65535单位秒
+					timeout-day 1-1000单位是天
+
+      启用/禁用策略规则
+		禁用：disable  启用：enable
+				示例1：
+				# service 1521
+				  	# tcp dst-port 1521 src-port 0 65535 
+
+				# address 172.22.0.0/16
+				    # ip 172.22.0.0/16
+
+				# address 10.197.5.0/24
+					# ip 10.197.5.0/24
+
+				# policy-global
+				# rule from any to any service icmp permit 
+				# rule id 1
+				# src-zone trust
+				# dst-zone untrust
+				# src-addr 172.22.0.0/16
+				# dst-addr 10.197.5.0/24
+				# service 1521
+				# action permit
+				# exit
+
+				示例2：
+				# policy-global
+				# rule from any to any service icmp permit 
+
+                show policy-group 查看策略
+配置静态路由
+
+	ip vrouter [vrouter-name]
+			ip route {A.B.C.D/M | A.B.C.D A.B.C.D} {A.B.C.D | interface-name [A.B.C.D] | vrouter vrouter-name} [distance-value] [weight weight-value] [description description]
+
+			示例：
+			ip vrouter trust-vr
+			ip route 0.0.0.0/0  ethernet0/2  10.190.70.14
+			ip route 10.190.0.0/16  ethernet0/8  10.190.62.46
+
+			show ip route vrouter trust-vr 查看路由信息
+
+NTP配置
+			ntp enable
+			ntp server 10.254.192.21 prefer
+			ntp server 10.254.193.21
+
+			show ntp status查看NTP配置信息和状
+
+时区配置
+			clock zone china
+
+			show clock  查看当前的时区配置信息。
+
+SNMP配置
+
+			interface MGT0
+			 manage snmp
+			 exit
+			 snmp-server manager 
+			 snmp-server host 10.254.160.32 version 2c community DLBankSNMP ro 
+			 snmp-server trap-host 10.254.160.32 version 2c community DLBankSNMP port 162
+			 show snmp-server  SNMP配置信息
+
+
+syslog日志配置
+			logging facility local7 
+			logging syslog 10.254.160.32 source-interface MGT0  tcp 162
+
+
+虚实地址配置	interface ethernet0/3
+			  zone untrust
+			  ip address 11.190.56.65 255.255.255.240  虚地址 
+			  bandwidth downstream 2000000000
+			  bandwidth upstream 2000000000
+			  manage ip 11.190.56.66  实地址 除了该命令不会在ha cluster 之间同步，其它都会同步。因此此命令主备都要手动配置
+			  manage ping
+			  exit
+
+手动同步HA信息 
+			在某些特殊情况下，可能出现主备配置信息不同步现象。此时，需要用户手动同步主备设备的 配置信息。用户可以通过以下方法进行手动同步： 
+			同步配置信息 exec ha sync configuration 通过show config验证
+			同步文件信息 exec ha sync file file-name  通过show file验证
+			同步ARP表项  exec ha sync rdo arp 通过show arp验证
+
+			show logging alarm  查看日志告警信息
+			clear led ALM 清除指示灯告警信息
+
+
+			注意：山石防火墙nat分为snat和dnat，因此在做双向nat时，需要配置snat和dnat两条
+
+
+
+
+
+
