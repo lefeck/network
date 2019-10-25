@@ -1,0 +1,106 @@
+华为s5700交换机
+
+默认用户名密码：admin/admin@huawei.com
+
+
+#console登录
+
+system-view
+user-interface console 0
+authentication-mode password
+set authentication password cipher admin@123
+q
+
+#ssh配置
+
+stelnet server enable
+telnet server enable
+
+system-view
+user-interface vty 0 4
+protocol inbound all 
+authentication-mode aaa
+quit
+
+aaa 
+local-user admin password irreversible-cipher admin@123
+local-user admin service-type telnet ssh 
+local-user admin privilege level 15
+qui
+
+#修改主机名
+
+sysname BABT-3F-Core-SW1
+
+#添加vlan
+
+vlan batch 3051 to 3054
+
+
+#时区配置
+
+clock timezone Beijing add 08:00:00
+
+#ntp配置
+
+ntp-service server enable
+ntp-service ipv6 server disable
+ntp-service unicast-server 10.155.0.1
+
+access配置
+
+vlan batch 3051 to 3054
+
+interface range GigabitEthernet 0/0/1 to GigabitEthernet 0/0/48
+ port link-type access
+ port default vlan 3051
+ stp edged-port enable
+ quit
+
+#trunk捆绑配置
+
+interface GigabitEthernet0/0/49
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+undo shut
+q
+
+interface GigabitEthernet0/0/51
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+undo shut
+
+interface GigabitEthernet0/0/52
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+undo shut
+q
+
+
+#带外管理配置
+
+vlan batch 10
+
+interface Vlanif10
+ description ShengChanGuanLi-IP
+ ip address 172.16.10.11 255.255.255.0
+q
+
+interface GigabitEthernet0/0/49
+ port link-type trunk
+ port trunk allow-pass vlan 10 3051 to 3054
+q
+interface GigabitEthernet0/0/50
+ port link-type trunk
+ port trunk allow-pass vlan 10 3051 to 3054
+q
+interface GigabitEthernet0/0/51
+ port link-type trunk
+ port trunk allow-pass vlan 10 3051 to 3054
+q
+
+
+ip route-static 172.16.10.0 24 172.16.10.10
+q
+save
+y

@@ -1,0 +1,104 @@
+
+#全局dhcp配置
+
+dhcp enable
+
+ip pool 1Fand2F
+ gateway-list 192.168.1.126
+ network 192.168.1.0 mask 255.255.255.0
+ excluded-ip-address 192.168.1.2254
+ dns-list 202.106.0.20
+
+interface Vlanif10
+ ip address 192.168.1.1 255.255.255.0
+ dhcp select global
+
+ntp配置
+
+ntp-service unicast-server 10.155.0.1
+ntp-service refclock-master
+ntp-service unicast-server 10.254.207.99
+
+
+vlan batch 3051 to 3054
+
+
+dhcp enable
+
+interface Vlanif3051
+ ip address 10.69.51.254 255.255.255.0
+ undo shutdown
+ dhcp select global
+ qui
+ip pool 1Fand2F
+ gateway-list 10.69.51.254
+ network 10.69.51.0 mask 255.255.255.0
+ excluded-ip-address 10.69.51.230 10.69.51.253
+ dns-list 202.106.0.20 10.24.10.10 10.24.10.11 
+ qui
+
+interface Vlanif3052
+ ip address 10.69.52.254 255.255.255.0
+ dhcp select global
+ undo shutdown
+
+ip pool 3Fand4F
+ gateway-list 10.69.52.254
+ network 10.69.52.0 mask 255.255.255.0
+ excluded-ip-address 10.69.52.230 10.69.52.253
+ dns-list 202.106.0.20 10.24.10.10 10.24.10.11
+
+interface GigabitEthernet1/0/4
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+ undo shut
+
+interface GigabitEthernet1/0/6
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+ undo shut
+
+interface GigabitEthernet1/0/8
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+undo shut
+
+interface GigabitEthernet1/0/10
+ port link-type trunk
+ port trunk allow-pass vlan 3051 to 3054
+undo shut
+
+
+interface Vlanif3053
+ ip address 10.69.53.254 255.255.255.0
+ undo shutdown
+ qui
+
+interface range GigabitEthernet1/0/12 to GigabitEthernet1/0/45
+ port link-type access
+ port default vlan 3053
+ undo shut
+ qui
+
+interface GigabitEthernet1/0/0
+undo portswitch
+ip add 10.68.3.70 29
+ undo shut
+ qui
+
+
+interface GigabitEthernet1/0/47
+undo portswitch
+ip add 10.37.10.254
+ undo shut
+ qui
+
+interface GigabitEthernet0/0/1
+ des  GuanLiDesktop-1
+ port link-type access
+ port default vlan 10
+
+interface GigabitEthernet0/0/2
+ des  GuanLiDesktop-2
+ port link-type access
+ port default vlan 10
